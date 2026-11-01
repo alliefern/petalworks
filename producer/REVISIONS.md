@@ -115,3 +115,12 @@ What that means here, based on Northgard's territory borders:
 - Gameplay stays on the tile grid: only tiles inside the shape are buildable. The curve is drawn around those tiles, smoothed.
 - Expansions should grow the shape organically along the same kind of curve, not add a rectangle.
 Take screenshots at 1280x800 and 1024 wide and put them in producer/shots/.
+
+## 2026-11-01 21:13 UK: Allie's playtest bugs and requests (do right after the plot outline, before anything else)
+1. **Belts are broken (bug, top priority).** Allie: "they go all straight and then also turn at the same time, overlapping." A belt tile is drawing a straight sprite AND a corner sprite at once. Each belt tile must show exactly one piece, chosen from its neighbors: straight, corner (correct direction), or end. When a neighbor changes, the old piece is replaced, never stacked. Check every rotation, placing belts by dragging, removing a belt mid-line, and loading a save. Add a unit test for the belt-piece choice and screenshot a belt loop with all four corner types to producer/shots/.
+2. **Machines change size when placed (bug).** The hover/placement ghost is one size and the placed building is bigger. The ghost must use the exact same sprite, scale, anchor and footprint as the placed building, so placing it causes no visible jump. Check every machine and bed, at all zoom levels.
+3. **Sound controls.**
+   - Put a visible sound on/off toggle on the main screen (top bar, near the speed controls), not only inside Settings. Speaker icon, clear on and off states, keyboard reachable, with an aria-label, and remembered between sessions.
+   - In Settings, add two sliders: Music volume and Sound effects volume (0-100), saved between sessions, with the effects slider playing a short sample sound when you let go of it. The main toggle mutes everything without losing the slider levels.
+   - Use normal capitalization in labels. Add any new strings to docs/content/copy.json.
+Keep the tests green, and note each fix in STATUS.md with before and after screenshots.
