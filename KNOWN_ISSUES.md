@@ -12,12 +12,16 @@ Honest list. Nothing here is disguised as finished.
 - Screen readers get a polite announcement for the keyboard cursor tile; there is no per-tile tour of the whole garden.
 - Balance has been checked against `docs/design/BALANCE.md` and the Vitest affordability test, not against human playtests. The e2e harness drives the sim faster than a person would.
 
+## Plot shape
+- The hedge's inner corners are the strip pieces cropped to their meeting square; if the art team paints dedicated inner-corner pieces they can replace that in one place (`rebuildGround` in `src/game/PetalScene.ts`).
+- Saves from the box-shaped yard load with an extra `legacy-potting` plot (and `legacy-south-rim` if expanded) so their notch-corner buildings stay valid; those gardens keep the old box outline.
+
 ## Copy
 - `docs/content/copy.json` is wired for every string it covers. About 60 short strings it does not cover yet (zoom/fit buttons, "Order 1 of 6", the open-market line, a few error lines, extra keyboard rows) live in `EXTRA` in `src/ui/strings.ts` with the same key style, listed in `producer/QUESTIONS.md` #7.
 - The copy's "place a Packing Station" opening tip is skipped because the station is pre-placed.
 
 ## Layout
-- Below about 1064 px wide, Fit (the whole 16-tile yard at the 40 px tile floor) cannot sit beside both side cards (212 px each), so at 1024×640 the cards cover the yard's outer columns after Fit. The default framing (the used area) stays clear of the cards at every size, and the cards shrink below 1150 px. From 1280 px up the whole yard fits beside the cards.
+- Below about 1200 px wide, Fit (the whole 18-tile yard at the 40 px tile floor) cannot sit beside both side cards (212 px each), so at 1024×640 the cards cover the yard's outer columns after Fit. The default framing (the used area) stays clear of the cards at every size, and the cards shrink below 1150 px. From 1280 px up the whole yard fits beside the cards.
 
 ## Performance
 - First load at Slow 4G is about 7.8 s to a clickable New Game (1.43 MB). The remaining weight is Phaser's bundle and three full Nunito TTFs; font subsetting and a slimmer Phaser build are not done.

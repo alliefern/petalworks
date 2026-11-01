@@ -158,8 +158,8 @@ await page.getByRole('radio', { name: 'Sound effects off', exact: true }).click(
 await page.getByRole('radio', { name: 'Music off', exact: true }).click();
 await page.keyboard.press('Escape');
 // Refresh mid-delivery: same garden, same coins, same order, items once.
-const before = await ev(() => JSON.stringify(window.petalworks.sim.world));
-await ev(() => window.petalworks.save());
+// Snapshot and save in one page call so no sim tick can land between them.
+const before = await ev(() => { window.petalworks.save(); return JSON.stringify(window.petalworks.sim.world); });
 await page.reload();
 await page.click('[data-testid="continue"]');
 await page.waitForSelector('[data-testid="order"]');

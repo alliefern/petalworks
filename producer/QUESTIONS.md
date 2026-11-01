@@ -17,3 +17,7 @@ Each has the default I am building with. None blocks progress. (1–6 and the nu
 7. **copy.json extra gained one key.** The title's loading bar needs "Loading the garden" (`extra.title.loadingGarden`). PR #12's test requires every leftover string to exist in copy.json, so I added that key with my placeholder text. Edit the wording as you like.
 
 8. **1024×640 and the side cards.** Fit shows the whole yard at the 40 px floor, which is 640 px wide; the tip and order cards are 212 px each, so both cannot clear the yard in a 1024 px window (needs about 1064). The default framing keeps the used area clear, and every click in the scripted playthrough lands. **Default: leave it**, documented in KNOWN_ISSUES. Alternative if you want zero overlap there: auto-collapse the tip card to a pill below 1064 px.
+
+9. **Expansion copy line.** `extra.palette.expandLine` said "The garden grows to 20 × 14. Permanent.", which the new shape makes untrue. I changed it (in copy.json and the fallback) to "Opens an east wing and a south corner, about 90 more tiles. Permanent." Reword as you like.
+
+10. **Plot shape.** The starting yard and the expansion follow the tile map in `src/sim/data/plots.ts`. If Allie wants a different silhouette, it is data: edit the rectangles, and the hedge, closed field, label and tests follow. The only rule I kept is that old saves get a legacy plot covering the old box, so nothing built ever becomes invalid.

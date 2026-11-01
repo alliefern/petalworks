@@ -82,8 +82,11 @@ test.describe('Petalworks smoke', () => {
 
     // Reload mid-transport: same garden, same coins, same order, items once.
     await page.evaluate(() => (window as any).petalworks.fastForward(43));
-    const before = await page.evaluate(() => JSON.stringify((window as any).petalworks.sim.world));
-    await page.evaluate(() => (window as any).petalworks.save());
+    // Snapshot and save in one page call so no sim tick can land between them.
+    const before = await page.evaluate(() => {
+      (window as any).petalworks.save();
+      return JSON.stringify((window as any).petalworks.sim.world);
+    });
     await page.reload();
     await page.waitForSelector('[data-testid="continue"]');
     await page.click('[data-testid="continue"]');
