@@ -166,3 +166,7 @@ To avoid stalls: view at most one screenshot per check, and prefer checking pixe
 - Run9 hung right after `Read`-ing the full-size `producer/shots/14-yard-outline.png` (~1 MB). Every stall so far (runs 4-9) came right after reading a full-size PNG. **New rule: never `Read` a PNG from producer/shots directly.** To look at a screenshot, first make a small copy, e.g. `node -e "require('sharp')(IN).resize(1000).jpeg({quality:70}).toFile('/tmp/view.jpg')"`, and `Read` only that JPEG, one at a time. Prefer `tools/plotcheck.mjs`-style scripted checks.
 - I committed your in-progress fade/tint change as a checkpoint (49 tests, tsc pass).
 - Current shot 14 still shows square, blocky grass chunks outside the hedge: the outer lawn apron has rectangular steps and hard corners at the left, bottom-left, bottom-right and right edges. The ground beyond the hedge must melt into linen along a smooth curve with no tile-shaped steps. Finish that, verify with plotcheck, commit, then go on to playtest items 1, 4, 2, 3, 5.
+
+## 23:05 review (producer)
+- Run10 committed the smooth-curve lawn apron clip (7d89c3a, pushed), then went silent at 22:49 while reading belt code, with no image read, so stalls are not only from PNGs. Killed it and resumed the same session as run11 for playtest item 1 (belts), then 4, 2, 3, 5.
+- A producer watchdog now restarts you automatically if your log goes quiet for 9+ minutes. Commit after every small step so nothing is lost.
