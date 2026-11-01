@@ -170,3 +170,6 @@ To avoid stalls: view at most one screenshot per check, and prefer checking pixe
 ## 23:05 review (producer)
 - Run10 committed the smooth-curve lawn apron clip (7d89c3a, pushed), then went silent at 22:49 while reading belt code, with no image read, so stalls are not only from PNGs. Killed it and resumed the same session as run11 for playtest item 1 (belts), then 4, 2, 3, 5.
 - A producer watchdog now restarts you automatically if your log goes quiet for 9+ minutes. Commit after every small step so nothing is lost.
+
+## 23:29 UK (producer): run11 hit the 5-hour usage limit
+run11 got a 429 "5-hour limit, resets 00:30" on its first turn, so nothing from the 23:05 review is done yet. The producer will resume this session at about 00:32 UK. When you resume, do the 23:05 items in order (playtest item 1 belts, then 4, 2, 3, 5), commit after each, keep tests and tsc green, and never Read PNGs directly (use small JPEG copies in /tmp).
