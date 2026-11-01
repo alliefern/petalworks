@@ -290,3 +290,9 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible, a:focus-vis
   .orderpanel, .tutorial, .inspector { width: 212px; padding: 10px 12px; }
   .topbar .group .btn span { display: none; }
 }
+
+/* ---- title loading bar ---- */
+.loading { margin: 4px auto 14px; width: min(360px, 100%); }
+.loading-bar { height: 10px; border-radius: 5px; background: rgba(57, 70, 59, 0.12); overflow: hidden; border: 1px solid rgba(57, 70, 59, 0.15); }
+.loading-bar > span { display: block; height: 100%; background: var(--moss); transition: width 120ms linear; }
+.loading-text { font-size: 14px; color: var(--ink-soft); margin-top: 6px; }

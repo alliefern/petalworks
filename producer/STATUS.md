@@ -14,6 +14,24 @@
 - Autosave, Continue / New Game with confirmation, corrupted-save backup, schema v2 with a v1 migration.
 - Default zoom keeps tiles at least 48 px; at 1366×768 the garden sits between the tip card and the order card instead of under them; the fit re-runs on window resize (Steam-plan guardrail).
 
+## Round of Nov 1, 19:30 (performance, from docs/research/PERFORMANCE.md)
+- **Build-time WebP atlas.** `tools/pack-art.mjs` runs before dev, test and build (`sharp`). It reads `assets/art/*.png` by file name (a missing name falls back to `assets/interim/`), packs the garden sprites into one 2048×1472 WebP sheet (quality 82, 2 px extruded edges so nothing bleeds) and writes single WebP files for the toolbar icons. The PNGs stay the source of truth; Allie's redesign still drops in by name. Output lives in `src/generated/` (ignored by git). `ground.locked` is no longer preloaded. The interim PNGs are no longer in the deploy.
+- **Loading bar.** The title shows "Loading the garden… 43%" while Phaser preloads; New Game enables when it is done.
+- **Long cache.** `vercel.json` sends `max-age=31536000, immutable` for `/assets/*` and `max-age=0, must-revalidate` for `index.html`.
+- Before / after (cold load, cache off, Slow 4G emulation, 1280×800, measured with `node tools/firstload.mjs`):
+
+| | Before (audit) | After |
+| --- | --- | --- |
+| Bytes before New Game works | 4.47 MB | 1.43 MB |
+| Requests before New Game works | 164 | 21 |
+| New Game clickable, Slow 4G | 23.0 s | 7.8 s |
+| Garden sprites on the wire | 152 PNGs, 3.80 MB | 1 WebP atlas, 0.63 MB (+30 KB JSON) |
+| Deploy size (`dist/`) | 10.19 MB (278 PNGs, 5.50 MB) | 6.29 MB (no PNGs; 1.57 MB of on-demand WebP singles) |
+
+  The 1.43 MB that remains is Phaser + app JS (1.49 MB raw, ~420 KB compressed), three Nunito TTFs (~175 KB compressed), the atlas, and the five title icons. Fonts and a slimmer Phaser build are the next cuts if wanted (not done).
+- One texture for the whole yard means Phaser batches the draw instead of switching among 152 textures.
+- Checks: 39 unit tests, 4 browser tests, build, `check_copy.py` all pass. Soak in the open market: 120 s at 3× with no errors and coins rising.
+
 ## Round of Nov 1, 17:15 (answers + review)
 - Speed buttons now read 1×, 2×, 3× (tooltips use the copy's normal/fast lines).
 - Default framing is the used part of the yard (structures + margin, at least 10×7 tiles, zoom capped) so a first chain fills the screen; Fit / Home shows the whole yard; the framing re-runs on resize.
@@ -36,7 +54,7 @@
 
 ## Next
 - Human playtest against `qa/playthrough-checklist.md`; answer anything in `producer/QUESTIONS.md`.
-- Move `EXTRA` strings into copy.json when the producer edits them.
+- Optional performance follow-ups from the audit's list 4–5: skip unchanged belt views per frame, cheaper HUD subscription, font subsetting, slimmer Phaser build, lighter music file.
 
 ## Blockers
 - Cannot push to GitHub from this sandbox (no credential). Commits are local on `main`.

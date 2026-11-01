@@ -80,3 +80,6 @@ docs/research/PERFORMANCE.md (PR #13) is merged. The game downloads 4.45 MB befo
 - Let the player start sooner, by loading only what the opening needs before New Game, or by showing progress.
 - Long-cache the hashed files (vercel.json headers: immutable, max-age=31536000 for /assets/*).
 Keep the tests green and note the before and after sizes in STATUS.md.
+
+## 2026-11-01 19:31 UK: resumed
+Resumed your session (run2) after the limit reset with the 18:10 and 18:45 items: finish and commit tools/soak.mjs, finish polish, then the performance fixes.

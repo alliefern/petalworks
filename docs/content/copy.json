@@ -524,6 +524,9 @@
     }
   },
   "extra": {
+    "title": {
+      "loadingGarden": "Loading the garden"
+    },
     "settings": {
       "paused": "The garden is paused while Settings is open.",
       "soundHelp": "Taps, pops, and chimes.",

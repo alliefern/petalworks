@@ -66,6 +66,7 @@ export class PetalScene extends Phaser.Scene {
   }
 
   preload(): void {
+    this.load.on('progress', (p: number) => this.store.setUi({ loadProgress: p }));
     this.sprites.preload(this);
   }
 
@@ -93,6 +94,7 @@ export class PetalScene extends Phaser.Scene {
 
     this.petals = this.add
       .particles(0, 0, this.tex('fx.petal.pink'), {
+        frame: this.sprites.get('fx.petal.pink').frame,
         lifespan: { min: 1200, max: 2200 },
         speed: { min: 40, max: 160 },
         angle: { min: 200, max: 340 },
@@ -105,6 +107,7 @@ export class PetalScene extends Phaser.Scene {
       .setDepth(DEPTH.fx);
     this.sparkles = this.add
       .particles(0, 0, this.tex('fx.sparkle'), {
+        frame: this.sprites.get('fx.sparkle').frame,
         lifespan: { min: 300, max: 600 },
         speed: { min: 10, max: 60 },
         scale: { start: 0.9, end: 0 },
@@ -123,9 +126,15 @@ export class PetalScene extends Phaser.Scene {
     return this.sprites.get(key).texture;
   }
 
+  /** Create an image from a semantic key (atlas frame or stand-alone texture). */
+  private img(x: number, y: number, key: string): Phaser.GameObjects.Image {
+    const ref = this.sprites.get(key);
+    return this.add.image(x, y, ref.texture, ref.frame);
+  }
+
   private setImage(img: Phaser.GameObjects.Image, key: string, extraAngle = 0): void {
     const ref = this.sprites.get(key);
-    if (img.texture.key !== ref.texture) img.setTexture(ref.texture);
+    if (img.texture.key !== ref.texture || (ref.frame !== undefined && img.frame.name !== ref.frame)) img.setTexture(ref.texture, ref.frame);
     img.setAngle(ref.angle + extraAngle);
   }
 
@@ -150,7 +159,7 @@ export class PetalScene extends Phaser.Scene {
     // Ground tiles overlap by a hair so fractional camera zoom never shows seams.
     const put = (key: string, x: number, y: number, depth: number = DEPTH.ground, scale = 1) => {
       const c = tileCenter(x, y);
-      const im = this.add.image(c.x, c.y, this.tex(key)).setDepth(depth);
+      const im = this.img(c.x, c.y, key).setDepth(depth);
       im.setDisplaySize(TILE * scale + 1, TILE * scale + 1);
       this.ground.push(im);
       return im;
@@ -274,10 +283,10 @@ export class PetalScene extends Phaser.Scene {
   private createView(s: Structure): StructureView {
     const c = tileCenter(s.x, s.y);
     const main = this.add.image(c.x, c.y, '__MISSING');
-    const endcap = this.add.image(c.x, c.y, this.tex('belt.end')).setVisible(false).setDepth(DEPTH.belt + 1);
+    const endcap = this.img(c.x, c.y, 'belt.end').setVisible(false).setDepth(DEPTH.belt + 1);
     endcap.setDisplaySize(TILE, TILE);
     const arrow = this.add.image(c.x, c.y, 'arrow.exit').setDepth(DEPTH.item - 1).setDisplaySize(14, 12);
-    const pennant = this.add.image(c.x, c.y, this.tex('badge.blocked')).setVisible(false).setDepth(DEPTH.badge);
+    const pennant = this.img(c.x, c.y, 'badge.blocked').setVisible(false).setDepth(DEPTH.badge);
     pennant.setDisplaySize(TILE * 0.5, TILE * 0.5);
     const disc = this.add.image(c.x, c.y, 'disc.blocked').setVisible(false).setDepth(DEPTH.badge + 1);
     disc.setDisplaySize(DISC_SIZE, DISC_SIZE);
@@ -420,10 +429,9 @@ export class PetalScene extends Phaser.Scene {
       alive.add(item.id);
       let v = this.items.get(item.id);
       if (!v) {
-        const tex = this.tex(itemKey(item.kind));
-        const outline = this.add.image(0, 0, tex).setDepth(DEPTH.item).setTintFill(COLORS.ink);
+        const outline = this.img(0, 0, itemKey(item.kind)).setDepth(DEPTH.item).setTintFill(COLORS.ink);
         outline.setDisplaySize(TILE * 0.5 + 2, TILE * 0.5 + 2);
-        const sprite = this.add.image(0, 0, tex).setDepth(DEPTH.item);
+        const sprite = this.img(0, 0, itemKey(item.kind)).setDepth(DEPTH.item);
         sprite.setDisplaySize(TILE * 0.5, TILE * 0.5);
         v = { outline, sprite };
         this.items.set(item.id, v);
@@ -498,7 +506,7 @@ export class PetalScene extends Phaser.Scene {
       for (let i = 0; i < path.length; i++) {
         let g = this.ghostBelts[i];
         if (!g) {
-          g = this.add.image(0, 0, this.tex('belt.straight.0')).setDepth(DEPTH.ghost).setAlpha(0.7);
+          g = this.img(0, 0, 'belt.straight.0').setDepth(DEPTH.ghost).setAlpha(0.7);
           g.setDisplaySize(TILE, TILE);
           this.ghostBelts[i] = g;
         }
@@ -653,7 +661,7 @@ export class PetalScene extends Phaser.Scene {
   private ringPop(s: Structure, reduced: boolean): void {
     if (reduced) return;
     const c = tileCenter(s.x, s.y);
-    const ring = this.add.image(c.x, c.y, this.tex('fx.ring')).setDepth(DEPTH.fx).setDisplaySize(TILE * 0.6, TILE * 0.6).setAlpha(0.9);
+    const ring = this.img(c.x, c.y, 'fx.ring').setDepth(DEPTH.fx).setDisplaySize(TILE * 0.6, TILE * 0.6).setAlpha(0.9);
     this.tweens.add({ targets: ring, displayWidth: TILE * 1.4, displayHeight: TILE * 1.4, alpha: 0, duration: 380, ease: 'Quad.easeOut', onComplete: () => ring.destroy() });
     const v = this.views.get(s.id);
     if (v) this.tweens.add({ targets: v.main, scaleX: 1.1, scaleY: 1.1, yoyo: true, duration: 110 });

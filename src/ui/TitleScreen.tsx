@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { store } from '../app/store';
 import { audio } from '../app/audio';
 import { Icon } from './Icon';
-import { COPY } from './strings';
+import { COPY, EXTRA } from './strings';
 
 export function TitleScreen({ ready }: { ready: boolean }) {
   const [confirm, setConfirm] = useState(false);
   const ui = store.ui;
+  const loadingLabel = `${EXTRA.title.loadingGarden}… ${Math.round(ui.loadProgress * 100)}%`;
   const start = () => {
     audio.unlock();
     store.newGame();
@@ -21,6 +22,14 @@ export function TitleScreen({ ready }: { ready: boolean }) {
         </div>
         <h1>{COPY.title.name}</h1>
         <p className="tag">{COPY.title.tagline}</p>
+        {!ready && (
+          <div className="loading" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(ui.loadProgress * 100)} aria-label={loadingLabel} data-testid="loading">
+            <div className="loading-bar">
+              <span style={{ width: `${Math.round(ui.loadProgress * 100)}%` }} />
+            </div>
+            <div className="loading-text">{loadingLabel}</div>
+          </div>
+        )}
         <div className="actions">
           {ui.hasSave && (
             <button

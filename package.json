@@ -11,7 +11,11 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "art:interim": "python3 tools/make_interim_art.py",
-    "shots": "node tools/shots.mjs"
+    "shots": "node tools/shots.mjs",
+    "art:pack": "node tools/pack-art.mjs",
+    "predev": "node tools/pack-art.mjs",
+    "prebuild": "node tools/pack-art.mjs",
+    "pretest": "node tools/pack-art.mjs"
   },
   "dependencies": {
     "phaser": "^3.90.0",
@@ -24,6 +28,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.1.2",
     "playwright": "^1.64.1",
+    "sharp": "^0.35.5",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"

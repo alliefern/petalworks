@@ -1,15 +1,17 @@
 /**
- * Asset manifest: semantic sprite keys -> files. The game never references a file
- * name directly. Resolution order for every key:
- *   1. assets/art/<file>        (final illustrated art, dropped in by the art team)
- *   2. assets/interim/<file>    (generated stand-ins, flagged interim)
+ * Asset manifest: semantic sprite keys -> built files. The game never references a file
+ * name directly. `assets/art/<file>.png` is the source of truth (the art team and Allie
+ * drop files in by name; a missing name falls back to `assets/interim/`). At build time
+ * `tools/pack-art.mjs` turns those PNGs into WebP atlases plus single WebP files in
+ * `src/generated/`, and this module reads only the generated output.
  * Facing variants fall back to the east-facing file plus a runtime rotation.
  * See docs/ASSET_SPECS.md for the full list.
  */
 import type { Dir, ItemKind, StructureKind } from '../sim/types';
+import atlasManifest from '../generated/atlas-manifest.json';
 
-const ART = import.meta.glob('../../assets/art/*.{png,webp}', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-const INTERIM = import.meta.glob('../../assets/interim/*.{png,webp}', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const SINGLES = import.meta.glob('../generated/webp/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const SHEET_FILES = import.meta.glob('../generated/garden-*.{webp,json}', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 
 function lookup(table: Record<string, string>, file: string): string | undefined {
   for (const [path, url] of Object.entries(table)) {
@@ -17,6 +19,31 @@ function lookup(table: Record<string, string>, file: string): string | undefined
   }
   return undefined;
 }
+
+export interface AtlasSheet {
+  name: string;
+  imageUrl: string;
+  dataUrl: string;
+  frames: number;
+}
+
+/** Atlas sheets to preload, with their built URLs. */
+export function atlasSheets(): AtlasSheet[] {
+  return atlasManifest.sheets.map((s) => ({
+    name: s.name,
+    imageUrl: lookup(SHEET_FILES, s.image) ?? '',
+    dataUrl: lookup(SHEET_FILES, s.data) ?? '',
+    frames: s.frames,
+  }));
+}
+
+/** Which sheet holds a file stem, if any. */
+export function atlasSheetFor(stem: string): string | undefined {
+  return (atlasManifest.frames as Record<string, string>)[stem];
+}
+
+/** File stems whose art came from the interim fallback rather than assets/art. */
+export const INTERIM_STEMS: string[] = atlasManifest.fromInterim;
 
 export interface ResolvedSprite {
   key: string;
@@ -30,38 +57,43 @@ export const FACING_LETTERS: Record<Dir, 'n' | 'e' | 's' | 'w'> = { 0: 'n', 1: '
 /** Rotation to turn an east-facing sprite toward `d`. */
 export const FACING_ANGLE: Record<Dir, number> = { 0: -90, 1: 0, 2: 90, 3: 180 };
 
-function resolveFile(file: string): { url: string; interim: boolean } | null {
-  const art = lookup(ART, file) ?? lookup(ART, file.replace(/\.png$/, '.webp'));
-  if (art) return { url: art, interim: false };
-  const interim = lookup(INTERIM, file);
-  if (interim) return { url: interim, interim: true };
-  return null;
+function resolveStem(stem: string): { url: string; interim: boolean } | null {
+  const url = lookup(SINGLES, stem + '.webp');
+  if (!url) return null;
+  return { url, interim: INTERIM_STEMS.includes(stem) };
+}
+
+/** East-facing stem for a facing key, used when the facing file is missing. */
+export function eastFallbackKey(key: string): { key: string; angle: number } | null {
+  const m = key.match(/^(bed|machine)\.([a-z_]+)\.([nesw])\.(.+)$/);
+  if (!m) return null;
+  const facing = m[3] as 'n' | 'e' | 's' | 'w';
+  return { key: `${m[1]}.${m[2]}.e.${m[4]}`, angle: { n: -90, e: 0, s: 90, w: 180 }[facing] };
 }
 
 /**
- * Resolve a semantic key. Facing keys look like `bed.daisy.n.ready`; if only the `e`
- * file exists the result carries the rotation to apply.
+ * Resolve a semantic key to a single built file (for <img> use and for sprites outside
+ * the atlas). Facing keys fall back to the east file plus a rotation.
  */
 export function resolveSprite(key: string): ResolvedSprite | null {
-  const file = keyToFile(key);
-  const direct = resolveFile(file);
+  const direct = resolveStem(keyToStem(key));
   if (direct) return { key, url: direct.url, angle: 0, interim: direct.interim };
-  const m = key.match(/^(bed|machine)\.([a-z_]+)\.([nesw])\.(.+)$/);
-  if (m) {
-    const facing = m[3] as 'n' | 'e' | 's' | 'w';
-    const eastKey = `${m[1]}.${m[2]}.e.${m[4]}`;
-    const east = resolveFile(keyToFile(eastKey));
-    if (east) {
-      const angle = { n: -90, e: 0, s: 90, w: 180 }[facing];
-      return { key, url: east.url, angle, interim: east.interim };
-    }
+  const fb = eastFallbackKey(key);
+  if (fb) {
+    const east = resolveStem(keyToStem(fb.key));
+    if (east) return { key, url: east.url, angle: fb.angle, interim: east.interim };
   }
   return null;
 }
 
-/** `bed.daisy.e.ready` -> `bed_daisy_e_ready.png`; `belt.straight.3` -> `belt_straight_3.png`. */
+/** `bed.daisy.e.ready` -> `bed_daisy_e_ready`; `belt.straight.3` -> `belt_straight_3`. */
+export function keyToStem(key: string): string {
+  return key.replace(/\./g, '_');
+}
+
+/** `bed.daisy.e.ready` -> `bed_daisy_e_ready.png` (the source file name in assets/art). */
 export function keyToFile(key: string): string {
-  return key.replace(/\./g, '_') + '.png';
+  return keyToStem(key) + '.png';
 }
 
 export function spriteUrl(key: string): string | undefined {
@@ -113,11 +145,10 @@ export function paletteKey(kind: StructureKind): string {
   }
 }
 
-/** Every key the world scene preloads. */
+/** Every key the world scene draws. (`ground.locked` is not drawn; the closed plot is tinted lawn.) */
 export function allSpriteKeys(): string[] {
   const keys: string[] = [];
   for (let i = 0; i < 4; i++) keys.push(`ground.grass.${i}`);
-  keys.push('ground.locked');
   for (const e of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']) keys.push(`edge.hedge.${e}`);
   for (let f = 0; f < BELT_FRAMES; f++) keys.push(`belt.straight.${f}`, `belt.corner.cw.${f}`, `belt.corner.ccw.${f}`);
   keys.push('belt.end');

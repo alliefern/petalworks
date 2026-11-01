@@ -27,7 +27,7 @@ Numbers follow `docs/design/BALANCE.md`: 120 starting coins; Daisy Bed 20/15, Be
 
 ## Art
 
-- The look is loaded through `src/assets/manifest.ts`: `assets/art/<file>` first, else `assets/interim/<file>`. A facing variant that is missing falls back to the east-facing file plus a runtime rotation. The full final set (187 files) is in `assets/art/`; the interim generator remains as a safety net.
+- Source art is `assets/art/<file>.png`, by file name (a missing name falls back to `assets/interim/<file>.png`). `tools/pack-art.mjs` runs before dev, test and build and writes `src/generated/`: one WebP atlas for the garden (frame name = file stem, identical pixels share a frame, 2 px extruded edges) plus single WebP files for `<img>` use. `src/assets/manifest.ts` reads only the generated output, so the game loads one texture instead of 152 and about a third of the bytes. A facing variant that is missing falls back to the east-facing frame plus a runtime rotation.
 - Hedge pieces have transparent lawn under the foliage, so a grass tile is drawn beneath each one. The closed plot is lawn under a moss tint with one outline (the locked tile art has a per-tile border; see `KNOWN_ISSUES.md`).
 - Status and selection are drawn in code over whatever pennant art arrives: cream discs with ink glyphs (`!`, `×`, check, `…`), ink-stroked tile rings with distinct shapes, an ink exit arrow on every bed, belt and machine, and an ink outline behind every item on a belt. This follows `docs/design/ACCESSIBILITY.md`.
 

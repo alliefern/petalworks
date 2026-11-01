@@ -13,3 +13,5 @@ Each has the default I am building with. None blocks progress. (1–6 and the nu
 5. **Default framing.** The game now opens on the used part of the yard (structures plus a 2-tile margin, at least 10×7 tiles, zoom capped at 1.5×). **Fit / Home** shows the whole yard. On small windows (1024 wide) the side cards still cover the yard's edge columns; the cards shrink below 1150 px and the first chain stays clear. Say if you'd rather the default be the whole yard.
 
 6. **Push rights.** `git push origin main` is rejected here (no GitHub token in the sandbox). Everything is committed locally on `main`. Options: pull from this checkout, or set `GH_TOKEN`/a credential helper for me and I'll push. Until then the Vercel build stays at the producer's last push.
+
+7. **copy.json extra gained one key.** The title's loading bar needs "Loading the garden" (`extra.title.loadingGarden`). PR #12's test requires every leftover string to exist in copy.json, so I added that key with my placeholder text. Edit the wording as you like.

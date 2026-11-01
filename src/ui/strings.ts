@@ -114,6 +114,9 @@ export function mergeExtra<T>(fallback: T, source: unknown, path = 'extra'): T {
 
 /** Built-in leftovers, used only when copy.json `extra` lacks that key. */
 export const EXTRA_FALLBACK = {
+  title: {
+    loadingGarden: 'Loading the garden',
+  },
   settings: {
     paused: 'The garden is paused while this is open.',
     soundHelp: 'Taps, pops, and chimes.',

@@ -19,6 +19,10 @@ Honest list. Nothing here is disguised as finished.
 ## Layout
 - At 1024 px wide the tip card and order card cover the yard's outer columns (the default framing keeps the first chain clear, and the cards shrink below 1150 px). From 1280 px up the cards sit beside the yard.
 
+## Performance
+- First load at Slow 4G is about 7.8 s to a clickable New Game (1.43 MB). The remaining weight is Phaser's bundle and three full Nunito TTFs; font subsetting and a slimmer Phaser build are not done.
+- The build step needs `sharp` (a native module) to pack the art; `npm ci` installs it.
+
 ## Platform
 - Desktop mouse and keyboard only. Touch is not implemented.
 - No service worker; the game needs its first load online (nothing is fetched after that).

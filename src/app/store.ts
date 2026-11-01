@@ -76,6 +76,8 @@ export interface UiState {
   announce: string;
   /** Short-lived labels drawn beside blocked buildings. */
   blockedLabels: BlockedLabel[];
+  /** Phaser preload progress 0..1 (title screen loading bar). */
+  loadProgress: number;
 }
 
 type Listener = () => void;
@@ -175,6 +177,7 @@ export class GameStore {
       celebration: null,
       announce: '',
       blockedLabels: [],
+      loadProgress: 0,
     };
     // A saved mute survives even on the title screen so the first click honors it.
     const peek = deserialize(existing);
