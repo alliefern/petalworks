@@ -547,7 +547,7 @@ describe('save and load', () => {
     expect(loaded.sim.world.orders.activeId).toBe('order2');
     expect(loaded.sim.world.orders.progress.delivered.daisy_bundle).toBe(1);
     expect(loaded.sim.world.unlockedPlotIds).toEqual(['potting']);
-    expect(loaded.sim.world.cols).toBe(18);
+    expect(loaded.sim.world.cols).toBe(19);
     expect(loaded.sim.world.basket.daisy).toBe(1);
     expect(loaded.settings).toMatchObject({ sound: false, music: true, reducedMotion: true, tutorialDismissed: true, speed: 2 });
     expect(Object.values(loaded.sim.world.structures).some((x) => x.kind === 'packing_station')).toBe(true);

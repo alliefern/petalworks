@@ -127,7 +127,8 @@ export class PetalScene extends Phaser.Scene {
 
     this.setupInput();
     this.scale.on('resize', () => this.applyFit(this.camCtl.reframe(this.store.ui.paletteOpen)));
-    (window as unknown as { __cam?: unknown }).__cam = this.cameras.main;
+    (window as unknown as { __cam?: unknown; __scene?: unknown }).__cam = this.cameras.main;
+    (window as unknown as { __scene?: unknown }).__scene = this;
     this.ready = true;
   }
 
@@ -192,10 +193,12 @@ export class PetalScene extends Phaser.Scene {
       const [x, y] = k.split(',').map(Number);
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) lawn.add(`${x + dx},${y + dy}`);
     }
+    // Open tiles sit above the fade so a fade stroke crossing a narrow bay never shows on
+    // buildable lawn; the apron and the closed preview sit below it and melt away.
     for (const k of lawn) {
       const [x, y] = k.split(',').map(Number);
       const r = seeded(x, y);
-      put(`ground.grass.${r < 0.72 ? 0 : r < 0.84 ? 1 : r < 0.94 ? 2 : 3}`, x, y);
+      put(`ground.grass.${r < 0.72 ? 0 : r < 0.84 ? 1 : r < 0.94 ? 2 : 3}`, x, y, openSet.has(k) ? DEPTH.ground + 0.4 : DEPTH.ground);
     }
 
     // The organic border: traced around the open tiles, smoothed and wobbled, pushed a
@@ -203,25 +206,21 @@ export class PetalScene extends Phaser.Scene {
     const loops = organicOutline(openTiles, TILE, 7).map((l) => offset(l, TILE * 0.12));
     const fade = this.add.graphics().setDepth(DEPTH.ground + 0.3);
     const border = this.add.graphics().setDepth(DEPTH.ground + 0.5);
+    this.ground.sort((a, b) => a.depth - b.depth);
     for (const loop of loops) {
-      // Soft fade from the border out to about a tile: rings between successive outward
-      // offsets, each a little more linen, so the lawn melts into the surroundings.
-      const steps = 8;
-      const reach = TILE * 1.1;
-      let prev = loop;
+      // Soft fade from the border out past the lawn apron: linen strokes along outward
+      // offsets of the curve, each a little stronger, so the lawn melts into the surroundings.
+      // (Strokes, not ring triangles: offsets self-cross at tight bays and triangles would flip.)
+      const steps = 14;
+      const reach = TILE * 1.7;
       for (let i = 1; i <= steps; i++) {
-        const next = offset(loop, (reach * i) / steps);
-        fade.fillStyle(COLORS.linen, Math.min(1, 0.1 + (i / steps) ** 1.4 * 0.95));
-        for (let j = 0; j < loop.length; j++) {
-          const a = prev[j];
-          const b = prev[(j + 1) % loop.length];
-          const c = next[(j + 1) % loop.length];
-          const d = next[j];
-          fade.fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y);
-          fade.fillTriangle(a.x, a.y, c.x, c.y, d.x, d.y);
-        }
-        prev = next;
+        const d = (reach * i) / steps;
+        // Each stroke is wider than the spacing so neighbours overlap into one gradient.
+        fade.lineStyle((reach / steps) * 2.6, COLORS.linen, Math.min(1, 0.05 + (i / steps) ** 1.6 * 0.6));
+        fade.strokePoints(offset(loop, d), true, true);
       }
+      fade.lineStyle(TILE * 0.8, COLORS.linen, 1);
+      fade.strokePoints(offset(loop, reach + TILE * 0.35), true, true);
       // One continuous painted border: a soft glow, the line, and a thin cream highlight.
       border.lineStyle(14, COLORS.cream, 0.28);
       border.strokePoints(loop, true, true);
@@ -250,17 +249,19 @@ export class PetalScene extends Phaser.Scene {
     // Closed field preview: a tint, the future border as a dotted kraft curve, and one
     // label placed on the closed tile farthest from the field's own edge so it fits inside.
     if (closedTiles.length) {
-      const tint = this.add.graphics().setDepth(DEPTH.ground + 0.35);
-      tint.fillStyle(COLORS.moss, 0.26);
+      const tint = this.add.graphics().setDepth(DEPTH.ground + 0.2);
+      tint.fillStyle(COLORS.moss, 0.2);
       for (const t of closedTiles) tint.fillRect(t.x * TILE, t.y * TILE, TILE + 1, TILE + 1);
+      const dashed = this.add.graphics().setDepth(DEPTH.ground + 0.55);
+      this.lockedGfx.push(dashed);
       const future = organicOutline([...openTiles, ...closedTiles], TILE, 7).map((l) => offset(l, TILE * 0.12));
       for (const loop of future) {
         const pts = resample(loop, 10);
-        tint.lineStyle(3, 0xc9a978, 0.9);
+        dashed.lineStyle(3, 0xc9a978, 0.9);
         for (let i = 0; i < pts.length; i += 2) {
           const a = pts[i];
           const b = pts[(i + 1) % pts.length];
-          tint.lineBetween(a.x, a.y, b.x, b.y);
+          dashed.lineBetween(a.x, a.y, b.x, b.y);
         }
       }
       this.lockedGfx.push(tint);
@@ -313,7 +314,7 @@ export class PetalScene extends Phaser.Scene {
     }
     for (const [k, x, y, sc] of [
       ['decor.terracotta', 0, 1, 0.85],
-      ['decor.watering_can', 16, 5, 0.9],
+      ['decor.watering_can', 19, 6, 0.9],
     ] as Array<[string, number, number, number]>) {
       if (open(x, y) || closedSet.has(`${x},${y}`)) continue;
       const im = put(k, x, y, DEPTH.decor + 1, sc);
