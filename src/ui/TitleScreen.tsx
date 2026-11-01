@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { store } from '../app/store';
 import { audio } from '../app/audio';
 import { Icon } from './Icon';
-import { S } from './strings';
+import { COPY } from './strings';
 
 export function TitleScreen({ ready }: { ready: boolean }) {
   const [confirm, setConfirm] = useState(false);
@@ -19,8 +19,8 @@ export function TitleScreen({ ready }: { ready: boolean }) {
           <Icon k="item.mixed_bouquet" size={56} />
           <Icon k="item.lavender_sachet" size={56} />
         </div>
-        <h1>{S.title.name}</h1>
-        <p className="tag">{S.title.tagline}</p>
+        <h1>{COPY.title.name}</h1>
+        <p className="tag">{COPY.title.tagline}</p>
         <div className="actions">
           {ui.hasSave && (
             <button
@@ -30,41 +30,41 @@ export function TitleScreen({ ready }: { ready: boolean }) {
                 audio.unlock();
                 store.continueGame();
               }}
-              title={S.title.continueHint}
+              title={COPY.title.continueHint}
               data-testid="continue"
             >
-              {S.title.continue}
+              {COPY.title.continue}
             </button>
           )}
           {ui.hasSave && !confirm ? (
             <button className="btn" disabled={!ready} onClick={() => setConfirm(true)} data-testid="new-game">
-              {S.title.newGame}
+              {COPY.title.newGame}
             </button>
           ) : ui.hasSave && confirm ? (
-            <div className="confirm" role="alertdialog" aria-label={S.newGameConfirm.title}>
+            <div className="confirm" role="alertdialog" aria-label={COPY.newGameConfirm.title}>
               <p>
-                <b>{S.newGameConfirm.title}</b> {S.newGameConfirm.body}
+                <b>{COPY.newGameConfirm.title}</b> {COPY.newGameConfirm.body}
               </p>
               <button className="btn danger" disabled={!ready} onClick={start} data-testid="new-game-confirm">
-                {S.newGameConfirm.confirm}
+                {COPY.newGameConfirm.confirm}
               </button>
               <button className="btn" onClick={() => setConfirm(false)}>
-                {S.newGameConfirm.cancel}
+                {COPY.newGameConfirm.cancel}
               </button>
             </div>
           ) : (
             <button className="btn primary" disabled={!ready} onClick={start} data-testid="new-game">
-              {S.title.newGame}
+              {COPY.title.newGame}
             </button>
           )}
         </div>
         {ui.saveProblem && (
-          <p className="problem">
-            <b>{S.save.unreadableTitle}.</b> {ui.saveProblem}
-          </p>
+          <div className="problem" role="alert">
+            <b>{COPY.save.unreadableTitle}.</b> {ui.saveProblem}
+          </div>
         )}
         <p className="footnote">
-          {S.title.savedHere} {S.title.soundHint}
+          {COPY.title.savedHere} {COPY.title.soundHint}
         </p>
       </div>
     </div>

@@ -35,6 +35,7 @@ export class PetalScene extends Phaser.Scene {
   private store!: GameStore;
   private camCtl!: CameraController;
   private ground: Phaser.GameObjects.Image[] = [];
+  private lockedGfx: Phaser.GameObjects.Graphics[] = [];
   private groundKey = '';
   private views = new Map<number, StructureView>();
   private items = new Map<number, ItemView>();
@@ -48,6 +49,7 @@ export class PetalScene extends Phaser.Scene {
   private dragging: null | { mode: 'pan' | 'belt' | 'maybe-pan'; startX: number; startY: number; lastX: number; lastY: number; moved: boolean } = null;
   private lastHover: { x: number; y: number } | null = null;
   private lastCursorKey = '';
+  private labels = new Map<number, Phaser.GameObjects.Container>();
   private petals?: Phaser.GameObjects.Particles.ParticleEmitter;
   private sparkles?: Phaser.GameObjects.Particles.ParticleEmitter;
   ready = false;
@@ -109,7 +111,7 @@ export class PetalScene extends Phaser.Scene {
       .setDepth(DEPTH.fx);
 
     this.setupInput();
-    this.scale.on('resize', () => this.camCtl.clamp());
+    this.scale.on('resize', () => this.recenter());
     (window as unknown as { __cam?: unknown }).__cam = this.cameras.main;
     this.ready = true;
   }
@@ -132,6 +134,8 @@ export class PetalScene extends Phaser.Scene {
     this.groundKey = key;
     for (const g of this.ground) g.destroy();
     this.ground = [];
+    for (const g of this.lockedGfx) g.destroy();
+    this.lockedGfx = [];
     const W = world.cols;
     const H = world.rows;
     const seeded = (x: number, y: number) => {
@@ -153,31 +157,47 @@ export class PetalScene extends Phaser.Scene {
         put(`ground.grass.${v}`, x, y);
       }
     }
-    // Closed plots show as wilder grass so the player can see what the expansion opens.
+    // Closed plots: plain lawn under a soft moss tint with one twine outline around the
+    // whole plot, so the player sees what Open Plot adds. (The per-tile ground.locked art
+    // carries its own border, which reads as a grid; see producer/QUESTIONS.md.)
     if (showLocked) {
       for (const p of PLOTS) {
         if (world.unlockedPlotIds.includes(p.id)) continue;
         for (let y = p.rect.y; y < p.rect.y + p.rect.h; y++) {
           for (let x = p.rect.x; x < p.rect.x + p.rect.w; x++) {
             if (isOpenTile(world, x, y)) continue;
-            put('ground.locked', x, y);
+            const r = seeded(x + 7, y + 3);
+            put(`ground.grass.${r < 0.8 ? 0 : 1}`, x, y);
           }
         }
+        const g = this.add.graphics().setDepth(DEPTH.ground + 0.6);
+        g.fillStyle(COLORS.moss, 0.28);
+        // Tint only the closed strip (the open plot is a sub-rectangle at the origin).
+        g.fillRect(world.cols * TILE, p.rect.y * TILE, (p.rect.x + p.rect.w - world.cols) * TILE, p.rect.h * TILE);
+        g.fillRect(p.rect.x * TILE, world.rows * TILE, world.cols * TILE, (p.rect.y + p.rect.h - world.rows) * TILE);
+        g.lineStyle(3, 0xc9a978, 0.9);
+        g.strokeRect(p.rect.x * TILE + 4, p.rect.y * TILE + 4, p.rect.w * TILE - 8, p.rect.h * TILE - 8);
+        this.lockedGfx.push(g);
       }
     }
-    // Hedge ring (sits one tile outside the open area).
+    // Hedge ring (sits one tile outside the open area). The hedge art has transparent
+    // lawn under the foliage, so a grass tile goes beneath each piece.
+    const hedge = (key: string, x: number, y: number) => {
+      put(`ground.grass.${(x * 7 + y * 3) % 2 === 0 ? 0 : 1}`, x, y, DEPTH.ground);
+      put(key, x, y, DEPTH.ground + 0.5);
+    };
     for (let x = 0; x < W; x++) {
-      put('edge.hedge.n', x, -1);
-      put('edge.hedge.s', x, H);
+      hedge('edge.hedge.n', x, -1);
+      hedge('edge.hedge.s', x, H);
     }
     for (let y = 0; y < H; y++) {
-      put('edge.hedge.w', -1, y);
-      put('edge.hedge.e', W, y);
+      hedge('edge.hedge.w', -1, y);
+      hedge('edge.hedge.e', W, y);
     }
-    put('edge.hedge.nw', -1, -1);
-    put('edge.hedge.ne', W, -1);
-    put('edge.hedge.sw', -1, H);
-    put('edge.hedge.se', W, H);
+    hedge('edge.hedge.nw', -1, -1);
+    hedge('edge.hedge.ne', W, -1);
+    hedge('edge.hedge.sw', -1, H);
+    hedge('edge.hedge.se', W, H);
     const decor: Array<[string, number, number, number]> = [
       ['decor.wildflower.0', 2, 1, 0.5],
       ['decor.tuft.0', W - 3, 2, 0.5],
@@ -255,14 +275,15 @@ export class PetalScene extends Phaser.Scene {
       return;
     }
     const bob = this.store.reducedMotion ? 0 : Math.sin(simTime / 220) * 1.5;
-    const x = c.x + TILE * 0.32;
-    const y = c.y - TILE * 0.32 + bob;
+    const inv = 1 / this.cameras.main.zoom; // keep the disc 28 CSS px at any zoom
+    const x = c.x + TILE * 0.34;
+    const y = c.y - TILE * 0.34 + bob;
     if (pennantKey && this.sprites.has(pennantKey)) {
       this.setImage(v.pennant, pennantKey);
-      v.pennant.setVisible(true).setPosition(x, y + 4);
+      v.pennant.setVisible(true).setPosition(x, y + 6 * inv).setDisplaySize(TILE * 0.5 * inv, TILE * 0.5 * inv);
     } else v.pennant.setVisible(false);
     if (v.disc.texture.key !== discKey) v.disc.setTexture(discKey);
-    v.disc.setVisible(true).setPosition(x, y);
+    v.disc.setVisible(true).setPosition(x, y).setDisplaySize(DISC_SIZE * inv, DISC_SIZE * inv);
   }
 
   private updateView(v: StructureView, s: Structure, world: World, simTime: number): void {
@@ -348,10 +369,11 @@ export class PetalScene extends Phaser.Scene {
       v.main.setDisplaySize(STRUCTURE_SIZE, STRUCTURE_SIZE).setDepth(DEPTH.structure + s.y * 0.01);
     }
 
-    // Ink exit arrow on the facing edge of everything that outputs.
+    // Ink exit arrow on the facing edge of everything that outputs (constant 14×12 CSS px).
     if (def.hasFacing) {
       const d = s.facing;
-      v.arrow.setVisible(true).setPosition(c.x + DX[d] * (TILE / 2 - 7), c.y + DY[d] * (TILE / 2 - 7)).setAngle(FACING_ANGLE[d]);
+      const inv = 1 / this.cameras.main.zoom;
+      v.arrow.setVisible(true).setPosition(c.x + DX[d] * (TILE / 2 - 7 * inv), c.y + DY[d] * (TILE / 2 - 7 * inv)).setAngle(FACING_ANGLE[d]).setDisplaySize(14 * inv, 12 * inv);
     } else v.arrow.setVisible(false);
 
     this.placeBadge(v, c, disc, pennant, simTime);
@@ -465,6 +487,43 @@ export class PetalScene extends Phaser.Scene {
         this.hoverRing.setTexture(ok ? (ui.tool.type === 'remove' ? 'ring.invalid' : 'ring.valid') : 'ring.invalid');
         this.hoverRing.setVisible(true).setPosition(c.x, c.y).setAlpha(ok ? 0.95 : 0.4);
       }
+    }
+  }
+
+  // ---- blocked labels (near the building, not a banner) ------------------------------------
+  private syncLabels(world: World): void {
+    const want = new Map(this.store.ui.blockedLabels.map((b) => [b.id, b]));
+    for (const [id, c] of this.labels) {
+      if (!want.has(id)) {
+        c.destroy();
+        this.labels.delete(id);
+      }
+    }
+    const inv = 1 / this.cameras.main.zoom;
+    for (const [id, b] of want) {
+      const s = world.structures[id];
+      if (!s) continue;
+      let c = this.labels.get(id);
+      if (!c) {
+        const text = this.add.text(0, 0, b.text, {
+          fontFamily: 'Nunito, "Segoe UI", sans-serif',
+          fontSize: '14px',
+          color: '#39463b',
+          fontStyle: '700',
+          wordWrap: { width: 220 },
+          align: 'center',
+        }).setOrigin(0.5, 0);
+        const pad = 8;
+        const bg = this.add.graphics();
+        bg.fillStyle(COLORS.cream, 0.96);
+        bg.lineStyle(2, COLORS.ink, 0.9);
+        bg.fillRoundedRect(-text.width / 2 - pad, -pad / 2, text.width + pad * 2, text.height + pad, 8);
+        bg.strokeRoundedRect(-text.width / 2 - pad, -pad / 2, text.width + pad * 2, text.height + pad, 8);
+        c = this.add.container(0, 0, [bg, text]).setDepth(DEPTH.fx + 1);
+        this.labels.set(id, c);
+      }
+      const t = tileCenter(s.x, s.y);
+      c.setPosition(t.x, t.y + TILE * 0.62).setScale(inv);
     }
   }
 
@@ -691,6 +750,7 @@ export class PetalScene extends Phaser.Scene {
     this.syncStructures(world, simTime);
     this.syncItems(world, this.store.alpha);
     this.syncOverlays(world);
+    this.syncLabels(world);
     this.handleEvents(this.store.drainEvents(), world);
   }
 }

@@ -1,40 +1,42 @@
+import { useState } from 'react';
 import { store } from '../app/store';
-import { S } from './strings';
+import { COPY, EXTRA } from './strings';
 import { tutorialStepFor } from './tutorial';
 
-function rich(text: string) {
-  const parts = text.split(/\*\*(.+?)\*\*/g);
-  return parts.map((p, i) => (i % 2 === 1 ? <b key={i}>{p}</b> : <span key={i}>{p}</span>));
-}
-
 export function Tutorial() {
-  const step = tutorialStepFor(store.sim.world);
+  const [seenOrder, setSeenOrder] = useState(false);
+  const step = tutorialStepFor(store.sim.world, seenOrder);
   if (!step) {
     return (
-      <aside className="card tutorial" aria-label={S.tutorial.help}>
-        <h4>{S.tutorial.help}</h4>
-        <p>{S.tutorial.keys}</p>
-        <p>{S.tutorial.mouse}</p>
+      <aside className="card tutorial" aria-label={COPY.howTo.title} data-testid="howto">
+        <h4>{COPY.howTo.title}</h4>
+        <p>{COPY.howTo.intro}</p>
+        <p>{EXTRA.tutorial.mouse}</p>
+        <p className="muted">{COPY.howTo.skipNote}</p>
         <div className="actions">
           <button className="btn" onClick={() => store.setUi({ tutorialOpen: false })}>
-            {S.tutorial.close}
+            {COPY.howTo.close}
           </button>
         </div>
       </aside>
     );
   }
+  const next = () => {
+    if (step.id === 'see-order') setSeenOrder(true);
+    else store.setUi({ tutorialOpen: false });
+  };
   return (
-    <aside className="card tutorial" aria-label={S.tutorial.help} data-testid="tutorial">
+    <aside className="card tutorial" aria-label={COPY.howTo.title} data-testid="tutorial">
       <h4>
         <span>{step.title}</span>
       </h4>
-      <p>{rich(step.body)}</p>
+      <p>{step.body}</p>
       <div className="actions">
-        <button className="btn quiet" onClick={() => store.dismissTutorial()} data-testid="tutorial-skip">
-          {S.tutorial.skip}
+        <button className="btn quiet" onClick={() => store.dismissTutorial()} data-testid="tutorial-skip" title={COPY.tutorial.skipped}>
+          {COPY.tutorial.skip}
         </button>
-        <button className="btn" onClick={() => store.setUi({ tutorialOpen: false })}>
-          {S.tutorial.gotIt}
+        <button className="btn" onClick={next}>
+          {step.id === 'see-order' ? COPY.tutorial.next : COPY.tutorial.gotIt}
         </button>
       </div>
     </aside>

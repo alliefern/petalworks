@@ -159,10 +159,9 @@ test.describe('Petalworks smoke', () => {
     await page.click('[data-testid="settings"]');
     await expect(page.getByTestId('settings-modal')).toBeVisible();
     // Sound off, music off, reduced motion on; Esc closes.
-    const groups = page.getByRole('radiogroup');
-    await groups.nth(0).getByRole('radio', { name: 'Off' }).click();
-    await groups.nth(1).getByRole('radio', { name: 'Off' }).click();
-    await groups.nth(2).getByRole('radio', { name: 'On' }).click();
+    await page.getByRole('radio', { name: 'Sound effects off', exact: true }).click();
+    await page.getByRole('radio', { name: 'Music off', exact: true }).click();
+    await page.getByRole('radio', { name: 'Reduced motion on', exact: true }).click();
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('settings-modal')).toHaveCount(0);
     await page.reload();

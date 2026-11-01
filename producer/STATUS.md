@@ -1,29 +1,34 @@
 # Status
 
-**Phase:** 2 done (first playable) · Phase 3 features built · Phase 4 polish in progress
-**Last updated:** Nov 1, 2026 (evening)
+**Phase:** Phases 1–3 complete · Phase 4 polish done for this pass · final art and final copy wired
+**Last updated:** Nov 1, 2026 (late evening)
 
 ## What works right now (plain English)
-- Start a garden, read the order, plant a Daisy Bed, drag belts to the crate, watch daisies ride in, get paid, unlock the next tool. All six orders work end to end (Vitest proves the chains; the Playwright browser test plays order 1 with real clicks and finishes the rest through the game's own actions).
-- Pause, 1×/2×/3×, undo, remove with refund, basket for recovered items, rotate before or after placing, ghost preview with valid/invalid rings and the cost.
-- Inspector for every structure: state, recipe, what's inside, progress in seconds, why it's blocked.
-- Status discs (`!`, `×`, check, `…`) drawn in ink on cream over the badges; ink exit arrows on everything; ink outlines on items, per the accessibility plan. One reduced-motion flag (follows the OS setting on first launch).
-- Full keyboard play: arrow cursor, Enter, R, Z, X, Delete, B, P, F, Home, = / -. Dialogs trap focus; Esc closes.
-- The real sound set is wired (music after first click, loops for machines and belts, blocked chime edge-triggered, final celebration on order 6). Sound and music toggles persist, including through New Game.
-- Autosave (after builds, after orders, every 10 s, on tab hide). Continue / New Game with confirmation. A corrupted save is backed up and the title offers New Game. Save schema v2 with a v1 migration.
-- Garden expansion (Open Plot, 100 coins) after order 4. Open market after order 6.
+- Start a garden, read Nell's order, plant a Daisy Bed, drag belts to the crate, watch daisies ride in, get paid, unlock the next tool. All six orders work end to end, then the market opens (goods sell on arrival, every tool available).
+- The art team's 187 final sprites are on screen (beds, belts, machines, items, badges, hedge, decor, toolbar icons, effects). Nothing interim is visible; the generator stays as a fallback.
+- The final copy (`docs/content/copy.json`) drives the HUD, order card, tips, inspector, errors and settings. `check_copy.py` passes. About 60 short strings the copy doesn't cover yet are in one place for the producer to edit (QUESTIONS #7).
+- Pause, 1×/Fast/3×, undo, remove with refund, basket for recovered items, rotate before or after placing, ghost preview with the cost.
+- Inspector for every structure: status in the copy's words, recipe, what's inside, progress in seconds, why it's blocked, which way it faces.
+- Status discs (`!`, `×`, check, `…`) stay 28 px at any zoom; a blocked bed or machine shows its reason in a small label beside it (no banner), and screen readers hear it. Toasts are capped at two and refunds merge.
+- Full keyboard play, dialogs trap focus, one reduced-motion flag, sound/music toggles persist. The real sound set is wired.
+- Autosave, Continue / New Game with confirmation, corrupted-save backup, schema v2 with a v1 migration.
+- Default zoom keeps tiles at least 48 px; at 1366×768 the garden sits between the tip card and the order card instead of under them; the fit re-runs on window resize (Steam-plan guardrail).
 
-## What changed for the producer's revisions
-- Balance numbers from BALANCE.md are in `src/sim/data/` (120 coins, new costs, 75% building refunds, full belt refunds, free pre-placed Packing Station, rewards 50/70/100/80/110/140, expansion 100).
-- Architecture seams: schema version + migrations, plot ids, order board, recipe ids on machines, typed per-ingredient buffers (8), ports as data, 10 Hz tick with a tested tick order, no Date.now/Math.random in the sim.
-- Strings are in one module keyed like copy.json, ready for the copy pass.
+## For the producer's notes
+- Visual review (16:47): default framing tightened and side cards clear the yard; toasts capped at 2 with merged refunds; blocked warning sits beside the building; status glyphs are ink-on-cream discs at a fixed screen size.
+- Steam guardrails (§3): all kept true; `src/app/shell.ts` holds the no-op hooks. No Electron/Steam code added.
+- Art: `ground_locked.png` has a per-tile border that tiles into a grid, so the closed plot is drawn as tinted lawn with one outline (QUESTIONS #9). Hedge pieces have transparent lawn, so grass is drawn under them.
+- Copy: the "place a Packing Station" opening tip conflicts with the pre-placed station and is skipped (QUESTIONS #6).
 
-## Docs
-`README.md`, `DESIGN_DECISIONS.md`, `KNOWN_ISSUES.md`, `producer/PLAYTEST.md`, `producer/QUESTIONS.md` (6 questions with defaults). Screenshots in `producer/shots/`.
+## Verified
+`npm test` 31/31 · `npm run build` clean · `npm run test:e2e` 3/3 (mouse-built order 1, reload mid-game, all six orders, sandbox reload, settings persistence, keyboard build, corrupted save) · 90 s headless soak at 3× with no runtime errors.
+
+## Screenshots (`producer/shots/`)
+00 title · 01 fresh garden · 02 first chain · 03 inspector · 04 all machines with a blocked bed and the keyboard cursor · 05 build ghost · 06 settings · 07 1366×768 · 08 1280×800 · 09 order-complete beat · 10 toolbar close-up · 11 top bar close-up.
 
 ## Next
-- Phase 4 polish sweep: hover sounds on palette, a full-run bug check at 3×, review the 1280×800 layout, settle anything the e2e flags.
-- Watch `assets/art/` for real sprites and check badge placement on them.
+- Human playtest against `qa/playthrough-checklist.md`; answer anything in `producer/QUESTIONS.md`.
+- Move `EXTRA` strings into copy.json when the producer edits them.
 
 ## Blockers
 None.

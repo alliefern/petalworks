@@ -4,15 +4,17 @@
  * React subscribes via useSyncExternalStore; Phaser reads it directly every frame.
  */
 import { TICK_MS } from '../sim/data/balance';
-import { ITEMS } from '../sim/data/items';
-import { ORDERS, orderById, orderIndex } from '../sim/data/orders';
+import { ORDERS, orderIndex } from '../sim/data/orders';
 import { STRUCTURES } from '../sim/data/structures';
+import { PLOTS } from '../sim/data/plots';
+const PLOT_COST = PLOTS[1].cost;
 import { createWorld, Sim } from '../sim/game';
 import { currentOrder, isSandbox } from '../sim/orders';
 import { DEFAULT_SETTINGS, deserialize, localStorageStore, memoryStore, serialize, type SaveStore, type Settings } from '../sim/save';
 import type { Action, ActionResult, BlockReason, Dir, ItemKind, SimEvent, Structure, StructureKind } from '../sim/types';
-import { fmt, S } from '../ui/strings';
+import { blockCopy, buildingName, COPY, EXTRA, facingWord, fmt, itemName, orderCopy } from '../ui/strings';
 import { audio } from './audio';
+import { shell } from './shell';
 
 export type Tool =
   | { type: 'select' }
@@ -24,6 +26,13 @@ export interface Notice {
   id: number;
   text: string;
   tone: 'info' | 'good' | 'bad';
+  until: number;
+  key?: string;
+}
+
+export interface BlockedLabel {
+  id: number;
+  text: string;
   until: number;
 }
 
@@ -65,26 +74,59 @@ export interface UiState {
   celebration: Celebration | null;
   /** Text for the polite live region describing the cursor tile. */
   announce: string;
+  /** Short-lived labels drawn beside blocked buildings. */
+  blockedLabels: BlockedLabel[];
 }
 
 type Listener = () => void;
 
-export function blockText(reason: BlockReason, item?: ItemKind | null, target?: string): string {
-  switch (reason) {
-    case 'queue':
-      return S.blocked.queue;
-    case 'dead_end':
-      return target === 'belt' ? S.blocked.beltEnd : S.blocked.noExit;
-    case 'head_on':
-      return S.blocked.headOn;
-    case 'wrong_item':
-      return fmt(S.blocked.wrongItem, { target: target ?? 'That machine', item: item ? ITEMS[item].name : 'that' });
-    case 'buffer_full':
-      return S.blocked.inputFull;
-    case 'stock_full':
-      return fmt(S.blocked.stockFull, { item: item ? ITEMS[item].plural : 'those' });
+/** One-line block message (label + detail) in copy.json's words. */
+export function blockText(reason: BlockReason, item?: ItemKind | null, target?: string, onBelt = false): string {
+  const c = blockCopy(reason, { item, target, onBelt });
+  return c.label ? `${c.label}. ${c.detail}` : '';
+}
+
+/** Map a sim action result to the final copy, filling cost/coins placeholders. */
+function messageFor(result: ActionResult, action: Action, coins: number): string | undefined {
+  const e = COPY.errors;
+  switch (result.error) {
+    case 'occupied':
+      return e.occupied;
+    case 'out_of_bounds':
+      return e.outside;
+    case 'locked_plot':
+      return e.lockedPlot;
+    case 'locked':
+      return e.locked;
+    case 'unaffordable': {
+      if (action.type === 'place_belt_path' && result.ids?.length) return e.fundsPath;
+      if (action.type === 'expand') return fmt(COPY.expansion.cantAfford, { cost: PLOT_COST, coins });
+      const cost = action.type === 'place' ? STRUCTURES[action.kind].cost : action.type === 'place_belt_path' ? STRUCTURES.belt.cost : 0;
+      if (action.type === 'undo') return EXTRA.errors.undoFunds;
+      return fmt(e.funds, { cost, coins });
+    }
+    case 'nothing_to_undo':
+      return e.undoEmpty;
+    case 'undo_unsafe':
+      return result.message?.includes('taken') ? EXTRA.errors.undoTaken : e.undoUnsafe;
+    case 'not_removable':
+      return fmt(EXTRA.errors.notRemovable, { name: buildingName('packing_station') });
+    case 'unknown_structure':
+      return action.type === 'remove' ? e.removeEmpty : undefined;
+    case 'not_a_belt':
+      return e.basketPlace;
+    case 'belt_occupied':
+      return e.beltFull;
+    case 'basket_empty':
+      return EXTRA.errors.basketEmpty;
+    case 'expansion_locked':
+      return EXTRA.errors.expansionLocked;
+    case 'already_expanded':
+      return EXTRA.errors.expansionDone;
+    case 'invalid':
+      return action.type === 'rotate' ? EXTRA.errors.packingNoFacing : undefined;
     default:
-      return '';
+      return undefined;
   }
 }
 
@@ -132,6 +174,7 @@ export class GameStore {
       keyPathActive: false,
       celebration: null,
       announce: '',
+      blockedLabels: [],
     };
     // A saved mute survives even on the title screen so the first click honors it.
     const peek = deserialize(existing);
@@ -201,7 +244,7 @@ export class GameStore {
     const result = deserialize(this.storage.get());
     if (!result.ok) {
       this.storage.backup();
-      this.setUi({ saveProblem: S.save.unreadableBody, hasSave: false });
+      this.setUi({ saveProblem: COPY.save.unreadableBody, hasSave: false });
       return false;
     }
     this.sim = result.sim;
@@ -310,22 +353,19 @@ export class GameStore {
       this.pendingEvents.push(e);
       switch (e.type) {
         case 'order_complete': {
-          const order = orderById(e.orderId);
+          const oc = orderCopy(e.orderId);
           const next = ORDERS[orderIndex(e.orderId) + 1];
-          const names: string[] = [];
-          if (next) {
-            for (const k of next.unlocks) names.push(STRUCTURES[k].name);
-            if (next.unlocksExpansion) names.push(S.celebration.expansionName);
-          }
-          const unlockLine = names.length ? fmt(S.celebration.unlockLine, { names: names.join(', ') }) : null;
+          let unlockLine: string | null = oc?.unlockLine ?? null;
+          if (next?.unlocksExpansion) unlockLine = (unlockLine ? unlockLine + ' ' : '') + fmt(EXTRA.celebration.unlockGeneric, { name: COPY.expansion.button });
           this.ui = {
             ...this.ui,
             celebration: e.final
               ? null
               : { orderId: e.orderId, reward: e.reward, unlockLine, final: e.final, until: performance.now() + 3200 },
           };
-          this.notify(fmt(S.celebration.complete, { customer: order?.customer ?? '' }) + ' ' + fmt(S.celebration.earned, { coins: e.reward }), 'good', 5000);
-          if (unlockLine) this.notify(unlockLine, 'good', 6000);
+          this.notify((oc?.complete ?? '') + ' ' + fmt(COPY.celebration.earned, { coins: e.reward }), 'good', 5000, 'order');
+          if (unlockLine) this.notify(unlockLine, 'good', 6000, 'unlock');
+          shell.onOrderCompleted(e.orderId, e.final);
           audio.play(e.final ? 'final_celebration' : 'order_complete');
           if (unlockLine) audio.play('unlock', { delay: 1.2 });
           this.save();
@@ -349,7 +389,9 @@ export class GameStore {
           const s = this.sim.world.structures[e.structureId];
           if (s) {
             const held = s.producer?.output?.kind ?? s.processor?.outputs[0]?.kind ?? null;
-            this.notify(fmt(S.blocked.noticeBed, { name: STRUCTURES[s.kind].name, why: blockText(e.reason, held).replace(/^Blocked: /, '') }), 'bad', 4500);
+            const text = blockText(e.reason, held, EXTRA.hud.orders && 'The machine ahead');
+            // Shown beside the building by the scene (no banner), announced for screen readers.
+            this.ui = { ...this.ui, blockedLabels: [...this.ui.blockedLabels.filter((b) => b.id !== s.id), { id: s.id, text, until: performance.now() + 4500 }].slice(-4), announce: `${buildingName(s.kind)}: ${text}` };
             audio.play('blocked', { throttleMs: 500 });
           }
           break;
@@ -398,28 +440,45 @@ export class GameStore {
           audio.play('build_place');
           break;
       }
-      if (result.message) this.notify(result.message, action.type === 'expand' ? 'good' : 'info');
+      if (action.type === 'expand') this.notify(COPY.expansion.opened, 'good', 3200, 'expand');
+      else if (action.type === 'remove') {
+        const removed = events.find((ev) => ev.type === 'removed');
+        if (removed && removed.type === 'removed') {
+          const kinds = Object.entries(removed.recovered).filter(([, n]) => (n ?? 0) > 0);
+          const total = kinds.reduce((a, [, n]) => a + (n ?? 0), 0);
+          const parts: string[] = [];
+          if (total === 1) parts.push(fmt(COPY.basket.removed, { item: itemName(kinds[0][0] as ItemKind) }));
+          else if (total > 1) parts.push(COPY.basket.removedMany);
+          if (removed.refund > 0) parts.push(fmt(COPY.basket.refund, { coins: removed.refund }));
+          if (parts.length) this.notify(parts.join(' '), 'info', 3200, 'refund');
+        }
+      } else if (action.type === 'place_belt_path' && result.message) this.notify(COPY.errors.dragSkipped, 'info', 3200, 'skip');
       this.save();
+      shell.onSaved();
     } else {
       audio.play('ui_error');
-      if (result.message) this.notify(result.message, 'bad');
+      const msg = messageFor(result, action, this.sim.world.coins) ?? result.message;
+      if (msg) this.notify(msg, 'bad', 3200, 'error');
     }
     this.emit();
     return result;
   }
 
-  notify(text: string, tone: Notice['tone'] = 'info', ms = 3200): void {
+  /** At most two toasts; a new toast with the same key replaces the old one (so refunds merge). */
+  notify(text: string, tone: Notice['tone'] = 'info', ms = 3200, key?: string): void {
     const now = performance.now();
-    const notices = this.ui.notices.filter((n) => n.text !== text);
-    notices.push({ id: this.noticeId++, text, tone, until: now + ms });
-    this.ui = { ...this.ui, notices: notices.slice(-4) };
+    const notices = this.ui.notices.filter((n) => n.text !== text && (!key || n.key !== key));
+    notices.push({ id: this.noticeId++, text, tone, until: now + ms, key });
+    this.ui = { ...this.ui, notices: notices.slice(-2) };
     this.emit();
   }
 
   private pruneNotices(): void {
     const now = performance.now();
-    if (this.ui.notices.some((n) => n.until <= now)) {
-      this.ui = { ...this.ui, notices: this.ui.notices.filter((n) => n.until > now) };
+    const staleNotice = this.ui.notices.some((n) => n.until <= now);
+    const staleLabel = this.ui.blockedLabels.some((n) => n.until <= now);
+    if (staleNotice || staleLabel) {
+      this.ui = { ...this.ui, notices: this.ui.notices.filter((n) => n.until > now), blockedLabels: this.ui.blockedLabels.filter((n) => n.until > now) };
       this.emit();
     }
   }
@@ -520,8 +579,8 @@ export class GameStore {
       const c = this.ui.cursor;
       if (!c) return;
       const s = this.sim.at(c.x, c.y);
-      const what = s ? describeStructure(s) : S.a11y.emptyTile;
-      this.setUi({ announce: fmt(S.a11y.cursorTile, { what, x: c.x + 1, y: c.y + 1 }) });
+      const what = s ? describeStructure(s) : EXTRA.a11y.emptyTile;
+      this.setUi({ announce: fmt(EXTRA.a11y.cursorTile, { what, x: c.x + 1, y: c.y + 1 }) });
     }, 400);
   }
 
@@ -551,7 +610,7 @@ export class GameStore {
       case 'remove': {
         const s = this.sim.at(c.x, c.y);
         if (s) this.dispatch({ type: 'remove', id: s.id });
-        else this.notify(S.palette.nothingHere, 'bad');
+        else this.notify(COPY.errors.removeEmpty, 'bad', 3200, 'error');
         break;
       }
       case 'basket': {
@@ -596,13 +655,15 @@ export class GameStore {
 
 export function describeStructure(s: Structure): string {
   const def = STRUCTURES[s.kind];
+  const st = COPY.states;
   let state = '';
-  if (s.belt) state = s.belt.item ? fmt(S.states.carrying, { item: ITEMS[s.belt.item.kind].name }) : S.states.empty;
-  else if (s.producer) state = s.producer.blockedTicks > 0 ? S.states.blocked : s.producer.output ? S.states.ready : S.states.growing;
-  else if (s.processor) state = s.processor.blockedTicks > 0 ? S.states.blocked : s.processor.workTicks !== null ? S.states.processing : s.processor.outputs.length ? S.states.ready : S.states.waiting;
-  else state = S.states.packingWaiting;
-  const facing = def.hasFacing ? ', ' + fmt(S.states.faces, { facing: S.facing[s.facing] }) : '';
-  return `${def.name}, ${state}${facing}`;
+  if (s.belt) state = s.belt.item ? fmt(st.belt.carrying.label, { item: itemName(s.belt.item.kind) }) : st.belt.empty.label;
+  else if (s.producer) state = s.producer.blockedTicks > 3 ? blockCopy(s.producer.block, { item: s.producer.output?.kind }).label : s.producer.output ? st.ready.label : st.growing.label;
+  else if (s.processor)
+    state = s.processor.blockedTicks > 3 ? blockCopy(s.processor.block, { item: s.processor.outputs[0]?.kind }).label : s.processor.workTicks !== null ? st.processing.label : s.processor.outputs.length ? st.ready.label : st.waiting.label;
+  else state = st.packing.waiting.label;
+  const facing = def.hasFacing ? ', ' + fmt(COPY.inspector.values.sends, { facing: facingWord(s.facing) }) : '';
+  return `${buildingName(s.kind)}, ${state}${facing}`;
 }
 
 export const store = new GameStore();

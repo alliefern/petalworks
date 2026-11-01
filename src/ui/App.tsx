@@ -15,7 +15,7 @@ import { CompletionModal } from './CompletionModal';
 import { TitleScreen } from './TitleScreen';
 import { BuildHint } from './BuildHint';
 import { CelebrationCard } from './CelebrationCard';
-import { S } from './strings';
+import { COPY, EXTRA } from './strings';
 
 const GARDEN_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' ', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D']);
 
@@ -156,12 +156,12 @@ export function App() {
         className="world"
         ref={worldRef}
         role="application"
-        aria-label={S.a11y.game}
+        aria-label={COPY.a11y.game}
         aria-describedby="garden-help"
         tabIndex={ui.screen === 'game' ? 0 : -1}
       />
       <span id="garden-help" className="sr-only">
-        {S.a11y.gameHelp}
+        {EXTRA.a11y.gameHelp}
       </span>
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {ui.announce}
@@ -170,7 +170,7 @@ export function App() {
       {ui.screen === 'game' && (
         <div className="hud">
           <a className="skip-link" href="#" onClick={(e) => { e.preventDefault(); worldRef.current?.focus(); }}>
-            Skip to garden
+            {EXTRA.a11y.skipToGarden}
           </a>
           <TopBar onRecenter={() => sceneRef.current?.recenter()} onZoom={(f) => sceneRef.current?.zoomBy(f)} />
           <OrderPanel />

@@ -1,19 +1,21 @@
 import { paletteKey } from '../assets/manifest';
 import { audio } from '../app/audio';
-import { blockText, store } from '../app/store';
+import { store } from '../app/store';
 import { BELT_TICKS, INPUT_BUFFER_PER_INGREDIENT, STOCK_CAP, TICK_HZ } from '../sim/data/balance';
-import { ITEMS } from '../sim/data/items';
 import { RECIPES } from '../sim/data/recipes';
 import { STRUCTURES } from '../sim/data/structures';
 import type { ItemKind, Structure } from '../sim/types';
 import { Icon } from './Icon';
-import { fmt, S } from './strings';
+import { blockCopy, building, buildingName, COPY, EXTRA, facingWord, fmt, itemName, recipeCopy } from './strings';
 
 function State({ kind, children }: { kind: string; children: React.ReactNode }) {
   return <span className={'state ' + kind}>{children}</span>;
 }
 
 const secs = (ticks: number) => (ticks / TICK_HZ).toFixed(ticks % TICK_HZ === 0 ? 0 : 1);
+const st = COPY.states;
+const L = COPY.inspector.labels;
+const V = COPY.inspector.values;
 
 export function Inspector() {
   const ui = store.ui;
@@ -21,29 +23,31 @@ export function Inspector() {
   const s: Structure | undefined = ui.selectedId !== null ? world.structures[ui.selectedId] : undefined;
   if (!s) return null;
   const def = STRUCTURES[s.kind];
-  const facing = S.facing[s.facing];
+  const c = building(s.kind);
+  const facing = facingWord(s.facing);
 
   let body: React.ReactNode = null;
   if (def.role === 'belt') {
     const b = s.belt!;
     const stuck = !!b.item && b.block !== 'none' && b.block !== 'queue';
+    const bc = b.item && b.block !== 'none' ? blockCopy(b.block, { item: b.item.kind, target: 'The machine ahead', onBelt: true }) : null;
     body = (
       <>
         <div className="row">
           {b.item ? (
             <>
-              <State kind={stuck ? 'blocked' : 'working'}>{stuck ? S.states.blocked : fmt(S.states.carrying, { item: ITEMS[b.item.kind].name })}</State>
+              <State kind={stuck ? 'blocked' : 'working'}>{stuck && bc ? bc.label : fmt(st.belt.carrying.label, { item: itemName(b.item.kind) })}</State>
               <span className="chip">
-                <Icon k={`item.${b.item.kind}`} /> {ITEMS[b.item.kind].name}
+                <Icon k={`item.${b.item.kind}`} /> {itemName(b.item.kind)}
               </span>
             </>
           ) : (
-            <State kind="idle">{S.states.empty}</State>
+            <State kind="idle">{st.belt.empty.label}</State>
           )}
         </div>
-        {b.item && b.block !== 'none' && <div className={stuck ? 'why' : 'muted'}>{blockText(b.block, b.item.kind, b.block === 'dead_end' ? 'belt' : 'The machine ahead')}</div>}
+        {bc && <div className={stuck ? 'why' : 'muted'}>{bc.detail}</div>}
         <div className="row">
-          {fmt(S.states.movesEvery, { seconds: BELT_TICKS / TICK_HZ })} {fmt(S.states.heading, { facing })}
+          {fmt(EXTRA.states.movesEvery, { seconds: BELT_TICKS / TICK_HZ })} {b.item ? fmt(st.belt.carrying.detail, { facing }) : fmt(st.belt.empty.detail, { facing })}
         </div>
       </>
     );
@@ -51,73 +55,96 @@ export function Inspector() {
     const p = s.producer!;
     const pct = p.output ? 100 : Math.round((100 * p.growTicks) / def.growTicks!);
     const blocked = p.blockedTicks > 3;
+    const bc = blocked ? blockCopy(p.block, { item: p.output?.kind, target: 'The machine ahead' }) : null;
     body = (
       <>
         <div className="row">
-          {blocked ? <State kind="blocked">{S.states.blocked}</State> : p.output ? <State kind="ready">{S.states.ready}</State> : <State kind="growing">{S.states.growing}</State>}
+          {bc ? <State kind="blocked">{bc.label}</State> : p.output ? <State kind="ready">{st.ready.label}</State> : <State kind="growing">{st.growing.label}</State>}
           <span className="chip">
-            <Icon k={`item.${def.produces}`} /> {fmt(S.states.growsEvery, { item: ITEMS[def.produces!].name, seconds: secs(def.growTicks!) })}
+            <Icon k={`item.${def.produces}`} /> {fmt(EXTRA.states.growsEvery, { item: itemName(def.produces!), seconds: secs(def.growTicks!) })}
           </span>
         </div>
         <div className="bar" aria-hidden>
           <span style={{ width: pct + '%' }} />
         </div>
-        <div className="muted">{p.output ? S.states.ready : fmt(S.states.progress, { elapsed: secs(p.growTicks), total: secs(def.growTicks!) })}</div>
-        {blocked && <div className="why">{blockText(p.block, p.output?.kind, 'The machine ahead')}</div>}
-        <div className="row">{fmt(S.states.outputLeaves, { facing })}</div>
+        <div className="muted">
+          {L.progress}: {p.output ? fmt(st.ready.detail, { item: itemName(p.output.kind) }) : fmt(V.progress, { elapsed: secs(p.growTicks), total: secs(def.growTicks!) })}
+        </div>
+        {bc && <div className="why">{bc.detail}</div>}
+        <div className="row">
+          {L.sends}: {fmt(V.sends, { facing })}. {c.inspector}
+        </div>
       </>
     );
   } else if (def.role === 'processor') {
     const m = s.processor!;
     const recipe = RECIPES[m.recipeId];
+    const rc = recipeCopy(m.recipeId);
     const pct = m.workTicks === null ? 0 : Math.round((100 * m.workTicks) / recipe.durationTicks);
     const blocked = m.blockedTicks > 3;
+    const bc = blocked ? blockCopy(m.block, { item: m.outputs[0]?.kind, target: 'The machine ahead' }) : null;
     const missing = Object.entries(recipe.inputs).filter(([k, n]) => m.inputs.filter((i) => i.kind === k).length < (n ?? 0));
     let state: React.ReactNode;
-    if (blocked) state = <State kind="blocked">{S.states.blocked}</State>;
-    else if (m.workTicks !== null) state = <State kind="working">{S.states.processing}</State>;
-    else if (m.outputs.length) state = <State kind="ready">{S.states.ready}</State>;
-    else if (m.inputs.length && missing.length === 1) {
+    let detail = '';
+    if (bc) {
+      state = <State kind="blocked">{bc.label}</State>;
+      detail = bc.detail;
+    } else if (m.workTicks !== null) {
+      state = <State kind="working">{st.processing.label}</State>;
+      detail = fmt(st.processing.detail, { item: itemName(recipe.output) });
+    } else if (m.outputs.length) {
+      state = <State kind="ready">{st.ready.label}</State>;
+      detail = fmt(st.ready.detail, { item: itemName(recipe.output) });
+    } else if (m.inputs.length && missing.length === 1) {
       const [k, n] = missing[0];
       const have = m.inputs.filter((i) => i.kind === k).length;
-      state = <State kind="waiting">{fmt(S.states.waitingFor, { count: (n ?? 0) - have, item: ITEMS[k as ItemKind].name })}</State>;
-    } else state = <State kind="waiting">{S.states.waiting}</State>;
+      state = <State kind="waiting">{fmt(st.waitingFor.label, { count: (n ?? 0) - have, item: itemName(k as ItemKind, (n ?? 0) - have) })}</State>;
+      detail = fmt(st.waitingFor.detail, { have, need: n ?? 0 });
+    } else {
+      state = <State kind="waiting">{st.waiting.label}</State>;
+      detail = fmt(st.waiting.detail, { takes: rc?.in ?? '' });
+    }
     body = (
       <>
         <div className="row">{state}</div>
-        <div className="label">{fmt(S.inspector.recipe, { seconds: secs(recipe.durationTicks) })}</div>
+        <div className="muted">{detail}</div>
+        <div className="label">{L.recipe}</div>
         <div className="row">
           {Object.entries(recipe.inputs).map(([k, n]) => (
             <span className="chip" key={k}>
-              <Icon k={`item.${k}`} /> {n}× {ITEMS[k as ItemKind].name}
+              <Icon k={`item.${k}`} /> {n}× {itemName(k as ItemKind, n ?? 1)}
             </span>
           ))}
           <span aria-hidden>→</span>
           <span className="chip">
-            <Icon k={`item.${recipe.output}`} /> {ITEMS[recipe.output].name}
+            <Icon k={`item.${recipe.output}`} /> {itemName(recipe.output)}
           </span>
+          <span className="muted">{fmt(rc?.time ?? '{seconds} seconds', { seconds: secs(recipe.durationTicks) })}</span>
         </div>
         <div className="bar" aria-hidden>
           <span style={{ width: pct + '%' }} />
         </div>
-        <div className="muted">{m.workTicks === null ? '—' : fmt(S.states.progress, { elapsed: secs(m.workTicks), total: secs(recipe.durationTicks) })}</div>
-        <div className="label">{S.inspector.holding}</div>
+        <div className="muted">
+          {L.progress}: {m.workTicks === null ? '—' : fmt(V.progress, { elapsed: secs(m.workTicks), total: secs(recipe.durationTicks) })}
+        </div>
+        <div className="label">{L.holds}</div>
         <div className="row">
           {Object.entries(recipe.inputs).map(([k]) => {
             const have = m.inputs.filter((i) => i.kind === k).length;
             return (
               <span className="chip" key={k}>
-                <Icon k={`item.${k}`} /> {have} / {INPUT_BUFFER_PER_INGREDIENT}
+                <Icon k={`item.${k}`} /> {fmt(V.input, { have, need: INPUT_BUFFER_PER_INGREDIENT, item: itemName(k as ItemKind, 2) })}
               </span>
             );
           })}
           <span className="chip">
-            <Icon k={`item.${recipe.output}`} /> {fmt(S.inspector.readyCount, { n: m.outputs.length })}
+            <Icon k={`item.${recipe.output}`} /> {fmt(EXTRA.states.readyCount, { n: m.outputs.length })}
           </span>
         </div>
-        {blocked && <div className="why">{blockText(m.block, m.outputs[0]?.kind, 'The machine ahead')}</div>}
-        {m.lastRefusedKind && world.tick - m.lastRefusedTick < 40 && <div className="why">{fmt(S.inspector.refused, { item: ITEMS[m.lastRefusedKind].name })}</div>}
-        <div className="row">{fmt(S.states.takesAnySide, { facing })}</div>
+        {m.lastRefusedKind && world.tick - m.lastRefusedTick < 40 && <div className="why">{fmt(EXTRA.states.refused, { item: itemName(m.lastRefusedKind) })}</div>}
+        <div className="row">
+          {L.sends}: {fmt(V.sends, { facing })}. {c.inspector}
+        </div>
       </>
     );
   } else {
@@ -126,48 +153,46 @@ export function Inspector() {
     body = (
       <>
         <div className="row">
-          <State kind={receiving ? 'ready' : 'idle'}>{receiving ? S.states.packingReceiving : S.states.packingWaiting}</State>
-          <span className="chip">{fmt(S.states.received, { count: s.packing!.received })}</span>
+          <State kind={receiving ? 'ready' : 'idle'}>{receiving ? st.packing.receiving.label : st.packing.waiting.label}</State>
+          <span className="chip">{fmt(EXTRA.states.received, { count: s.packing!.received })}</span>
         </div>
+        <div className="muted">{receiving ? st.packing.receiving.detail : st.packing.waiting.detail}</div>
         <div className="row">
-          {S.states.packingBody} {store.sandbox ? S.states.packingSandbox : fmt(S.states.packingCap, { cap: STOCK_CAP })}
+          {c.inspector} {store.sandbox ? EXTRA.states.packingSandbox : fmt(EXTRA.states.packingCap, { cap: STOCK_CAP })}
         </div>
-        {stock.length > 0 && (
-          <>
-            <div className="label">{S.states.stored}</div>
-            <div className="row">
-              {stock.map(([k, n]) => (
-                <span className="chip" key={k}>
-                  <Icon k={`item.${k}`} /> {n}
-                </span>
-              ))}
-            </div>
-          </>
-        )}
+        <div className="label">{L.stored}</div>
+        <div className="row">
+          {stock.length === 0 && <span className="muted">{V.storedEmpty}</span>}
+          {stock.map(([k, n]) => (
+            <span className="chip" key={k} title={fmt(st.packing.storedUnused.detail, { item: itemName(k, 2) })}>
+              <Icon k={`item.${k}`} /> {fmt(V.stored, { count: n, item: itemName(k, n) })}
+            </span>
+          ))}
+        </div>
       </>
     );
   }
 
   return (
-    <aside className="card inspector" aria-label={S.a11y.inspector} data-testid="inspector">
+    <aside className="card inspector" aria-label={COPY.a11y.inspector} data-testid="inspector">
       <h3>
-        <Icon k={paletteKey(s.kind)} size={34} /> {def.name}
+        <Icon k={paletteKey(s.kind)} size={34} /> {buildingName(s.kind)}
       </h3>
-      <div className="blurb">{def.blurb}</div>
+      <div className="blurb">{c.tooltip}</div>
       {body}
       <div className="actions">
         {def.hasFacing && (
-          <button className="btn" onClick={() => store.dispatch({ type: 'rotate', id: s.id })} onPointerEnter={() => audio.hover()} title={S.inspector.rotateTip} data-testid="inspector-rotate">
-            <Icon k="ui.rotate" size={18} /> {S.inspector.rotate}
+          <button className="btn" onClick={() => store.dispatch({ type: 'rotate', id: s.id })} onPointerEnter={() => audio.hover()} title={COPY.hud.rotateTooltip} aria-label={COPY.a11y.rotate} data-testid="inspector-rotate">
+            <Icon k="ui.rotate" size={18} /> {COPY.hud.rotate}
           </button>
         )}
         {def.removable && (
-          <button className="btn danger" onClick={() => store.dispatch({ type: 'remove', id: s.id })} onPointerEnter={() => audio.hover()} title={S.inspector.removeTip} data-testid="inspector-remove">
-            <Icon k="ui.remove" size={18} /> {S.inspector.remove}
+          <button className="btn danger" onClick={() => store.dispatch({ type: 'remove', id: s.id })} onPointerEnter={() => audio.hover()} title={EXTRA.inspector.removeTip} data-testid="inspector-remove">
+            <Icon k="ui.remove" size={18} /> {COPY.palette.tools.remove.name}
           </button>
         )}
-        <button className="btn quiet" onClick={() => store.select(null)} aria-label={S.a11y.close}>
-          {S.inspector.close}
+        <button className="btn quiet" onClick={() => store.select(null)} aria-label={COPY.a11y.close}>
+          {COPY.settings.close}
         </button>
       </div>
     </aside>

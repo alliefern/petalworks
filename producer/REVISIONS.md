@@ -52,3 +52,9 @@ The voice and capitalization pass on docs/content/ is merged (PR #9). docs/conte
 
 ## 2026-11-01 16:55 UK: the rest of the real art landed
 Codex finished. All decor_*, fx_* and ui_* sprites are now in assets/art/ (187 total). Swap the stand-in toolbar icons, decorations and petal effects for these, commit the art, and take fresh screenshots (title, a full garden, the toolbar close up). Allie wants to judge the real style from those.
+
+## 2026-11-01 17:15 UK: review of the 17:08 screenshots, and a live build
+- QUESTIONS.md 1-6 are answered in ANSWERS.md (all your defaults stand; make the speed labels consistent).
+- The game is now on Vercel, deploying from GitHub main on every push (project "petalworks", protected by Allie's Vercel login). Keep `npm run build` producing `dist/`, and commit + push your current work and the untracked decor_/fx_/ui_ art soon, so the live build gets it.
+- 04-all-machines.png: toasts are fixed (one at a time), good. Still to do: (1) the buildings still read small against a mostly empty lawn; frame the yard tighter by default (Fit to the used area plus a margin, or zoom in a step) so a first chain fills more of the screen; (2) the locked expansion area east of the hedge reads as a grid of separate hedge boxes; show it as one soft, faded locked field with a single "Open Plot, 100" label; (3) the Tip card's left edge overlaps the hedge at 1024 width; check 1024×640 and 1280×800 so no card covers playable tiles.
+- Allie is redesigning the art herself; her files will replace Codex's under the same names (see docs/ART_LIST.md). Keep loading art strictly by file name through the manifest, with no size or frame-count assumptions beyond ASSET_SPECS, so her drop-in works.

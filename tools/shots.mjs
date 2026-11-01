@@ -93,10 +93,10 @@ await page.mouse.move(640, 330);
 await page.waitForTimeout(300);
 await page.screenshot({ path: 'producer/shots/05-build-ghost.png' });
 
-await page.evaluate(() => {
-  window.petalworks.setTool({ type: 'select' });
-  window.petalworks.setUi({ settingsOpen: true });
-});
+await page.evaluate(() => window.petalworks.setTool({ type: 'select' }));
+await page.screenshot({ path: 'producer/shots/10-toolbar-closeup.png', clip: { x: 230, y: 760, width: 980, height: 130 } });
+await page.screenshot({ path: 'producer/shots/11-topbar-closeup.png', clip: { x: 660, y: 0, width: 780, height: 70 } });
+await page.evaluate(() => window.petalworks.setUi({ settingsOpen: true }));
 await page.waitForTimeout(200);
 await page.screenshot({ path: 'producer/shots/06-settings.png' });
 

@@ -13,8 +13,10 @@ export class CameraController {
   private worldH = 0;
   /** Screen-space padding reserved for the HUD (top bar / bottom palette). */
   padTop = 60;
-  padBottom = 120;
+  padBottom = 118;
   padBottomCollapsed = 56;
+  /** Width of the tip/inspector column (left) and order card (right). Reserved when the window is wide enough. */
+  sidePanel = 276;
 
   constructor(private scene: Phaser.Scene) {
     this.cam = scene.cameras.main;
@@ -32,18 +34,23 @@ export class CameraController {
    */
   fit(paletteOpen: boolean): { collapsePalette: boolean } {
     const vw = this.scene.scale.width;
-    const w = this.worldW + TILE * 0.6;
-    const h = this.worldH + TILE * 0.6;
-    const zoomFor = (padBottom: number) => Math.min(vw / w, (this.scene.scale.height - this.padTop - padBottom) / h);
+    const vh = this.scene.scale.height;
+    const w = this.worldW + TILE * 0.2;
+    const h = this.worldH + TILE * 0.2;
+    // Keep the garden out from under the side cards when there is room for 48 px tiles that way.
+    const gutters = vw - 2 * this.sidePanel >= w * (MIN_DEFAULT_TILE / TILE) ? this.sidePanel : 0;
+    const zoomFor = (padBottom: number) => Math.min((vw - 2 * gutters) / w, (vh - this.padTop - padBottom) / h);
     let collapse = false;
-    let zoom = zoomFor(paletteOpen ? this.padBottom : this.padBottomCollapsed);
+    let padBottom = paletteOpen ? this.padBottom : this.padBottomCollapsed;
+    let zoom = zoomFor(padBottom);
     if (paletteOpen && zoom * TILE < MIN_DEFAULT_TILE) {
       collapse = true;
-      zoom = zoomFor(this.padBottomCollapsed);
+      padBottom = this.padBottomCollapsed;
+      zoom = zoomFor(padBottom);
     }
     zoom = Phaser.Math.Clamp(zoom, FLOOR_TILE / TILE, this.maxZoom);
     this.cam.setZoom(zoom);
-    this.centerOnGarden(collapse ? this.padBottomCollapsed : paletteOpen ? this.padBottom : this.padBottomCollapsed);
+    this.centerOnGarden(padBottom);
     return { collapsePalette: collapse };
   }
 

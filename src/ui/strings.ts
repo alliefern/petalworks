@@ -1,106 +1,124 @@
 /**
- * Player-facing text, in one place, keyed like docs/content/copy.json so the final copy
- * pass can be swapped in with one change. These are placeholders in the same voice.
+ * Player-facing text. Everything the copy pass covers comes from docs/content/copy.json
+ * (final, owned by the producer). Keys copy.json does not have yet live in EXTRA below,
+ * keyed the same way, so they can move into copy.json without touching components.
  * American English, normal capitalization.
  */
-export const S = {
-  title: {
-    name: 'Petalworks',
-    tagline: 'A cozy flower workshop.',
-    continue: 'Continue',
-    continueHint: 'Pick up your saved garden.',
-    newGame: 'New Game',
-    savedHere: 'Your garden is saved on this device.',
-    soundHint: 'Sound starts after your first click.',
-  },
-  newGameConfirm: {
-    title: 'Start a new game?',
-    body: 'This erases your saved garden, coins, and orders.',
-    confirm: 'Start New Game',
-    cancel: 'Cancel',
-  },
-  save: {
-    unreadableTitle: "Couldn't open that save",
-    unreadableBody: "The saved garden can't be read. Start a new game to keep playing.",
-  },
+import copy from '../../docs/content/copy.json';
+import type { BlockReason, Dir, ItemKind, StructureKind } from '../sim/types';
+
+export const COPY = copy;
+
+export function fmt(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ''));
+}
+
+/** copy.json uses camelCase ids; the sim uses snake_case definition ids. */
+const BUILDING_KEY: Record<StructureKind, keyof typeof copy.palette.buildings> = {
+  daisy_bed: 'daisyBed',
+  lavender_bed: 'lavenderBed',
+  belt: 'belt',
+  bundling_table: 'bundlingTable',
+  drying_bench: 'dryingBench',
+  arrangement_table: 'arrangementTable',
+  packing_station: 'packingStation',
+};
+const ITEM_KEY: Record<ItemKind, keyof typeof copy.items> = {
+  daisy: 'daisy',
+  lavender: 'lavender',
+  daisy_bundle: 'daisyBundle',
+  lavender_sachet: 'lavenderSachet',
+  mixed_bouquet: 'mixedBouquet',
+};
+const DIR_KEY: Record<Dir, keyof typeof copy.facing> = { 0: 'n', 1: 'e', 2: 's', 3: 'w' };
+
+export const building = (kind: StructureKind) => copy.palette.buildings[BUILDING_KEY[kind]];
+export const buildingName = (kind: StructureKind): string => building(kind).name;
+export const itemName = (kind: ItemKind, n = 1): string => (n === 1 ? copy.items[ITEM_KEY[kind]].one : copy.items[ITEM_KEY[kind]].other);
+export const facingWord = (d: Dir): string => copy.facing[DIR_KEY[d]];
+export const recipeCopy = (id: string) => (copy.recipes as Record<string, { line: string; in?: string; out: string; time: string }>)[toCamel(id)];
+export const orderCopy = (id: string) => (copy.orders as unknown as Record<string, OrderCopy>)[id];
+
+export interface OrderCopy {
+  customer: string;
+  note: string;
+  itemId: string;
+  count: number;
+  requirement: string;
+  short: string;
+  reward: string;
+  complete: string;
+  unlocks: string[];
+  unlockLine: string | null;
+}
+
+function toCamel(id: string): string {
+  return id.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
+/** Label + detail for a block reason, in copy.json's words. */
+export function blockCopy(reason: BlockReason, opts: { item?: ItemKind | null; target?: string; onBelt?: boolean }): { label: string; detail: string } {
+  const b = copy.states.blocked;
+  const item = opts.item ? itemName(opts.item) : '';
+  switch (reason) {
+    case 'queue':
+      return { label: b.exitFull.label, detail: b.exitFull.detail };
+    case 'dead_end':
+      return opts.onBelt ? { label: b.beltEnd.label, detail: b.beltEnd.detail } : { label: b.noExit.label, detail: b.noExit.detail };
+    case 'head_on':
+      return { label: b.beltEnd.label, detail: EXTRA.blocked.headOn };
+    case 'wrong_item':
+      return opts.onBelt
+        ? { label: fmt(b.refused.label, { item }), detail: fmt(b.refused.detail, { target: opts.target ?? '', item }) }
+        : { label: fmt(b.wrongItem.label, { item }), detail: fmt(b.wrongItem.detail, { machine: opts.target ?? '', item }) };
+    case 'buffer_full':
+      return { label: b.inputFull.label, detail: b.inputFull.detail };
+    case 'stock_full':
+      return { label: EXTRA.blocked.stockFull, detail: fmt(EXTRA.blocked.stockFullDetail, { item: opts.item ? itemName(opts.item, 2) : '' }) };
+    default:
+      return { label: '', detail: '' };
+  }
+}
+
+/** Strings copy.json does not cover yet. Same key style; see producer/QUESTIONS.md. */
+export const EXTRA = {
   settings: {
-    title: 'Settings',
     paused: 'The garden is paused while this is open.',
-    sound: 'Sound effects',
     soundHelp: 'Taps, pops, and chimes.',
-    music: 'Music',
     musicHelp: 'A quiet music-box loop.',
-    reducedMotion: 'Reduced motion',
-    reducedMotionHelp: 'Quiets extra movement. The garden still runs.',
     tutorial: 'Tips',
-    tutorialHelp: 'Show the contextual tips again.',
-    replay: 'Replay tips',
+    tutorialHelp: 'Show the tips again from the start.',
     newGame: 'Start over',
-    newGameHelp: 'Clears this garden and starts a fresh one. Cannot be undone.',
+    newGameHelp: 'Clears this garden and starts a fresh one. This cannot be undone.',
     newGameButton: 'New game…',
     keep: 'Keep',
-    controls: 'Controls',
-    close: 'Back to the garden',
-    on: 'On',
-    off: 'Off',
+    backToGarden: 'Back to the garden',
   },
   hud: {
-    coins: 'Coins',
     orders: 'Orders',
-    pause: 'Pause',
-    resume: 'Resume',
-    paused: 'Paused',
     speed: 'Speed',
-    undo: 'Undo',
-    undoTooltip: 'Undo the last build (Z).',
+    speedN: '{n}×',
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',
     fit: 'Fit',
     fitTooltip: 'Fit the garden on screen (Home).',
-    help: 'Tips',
-    helpTooltip: 'Show the tips card (H).',
-    settings: 'Settings',
-    build: 'Build',
-    buildShow: 'Show build menu (B)',
-    buildHide: 'Hide build menu (B)',
-    orderDelivered: 'Delivered {have} of {need}',
-    sandboxTitle: 'Open market',
-    sandboxBody: 'All six orders are done. Everything you deliver now sells for coins, and every tool is unlocked.',
-    reward: 'Reward',
+    tips: 'Tips',
+    tipsTooltip: 'Show the tips card (H).',
     orderOf: 'Order {n} of {total}',
     forCustomer: 'for {customer}',
+    sandboxBody: 'Everything you deliver now sells for coins, and every building is yours to place.',
+    ordersDone: '{done} of {total} orders done',
   },
   a11y: {
-    game: 'Petalworks garden',
     gameHelp: 'Arrow keys move the cursor. Enter places or selects. R rotates. Escape cancels.',
-    coins: '{coins} coins',
-    ordersDone: '{done} of {total} orders done',
-    buildPalette: 'Build menu',
-    inspector: 'Selected structure',
-    order: 'Current order',
+    speedN: 'Speed {n} times',
     notices: 'Notices',
-    pause: 'Pause the garden (P)',
-    resume: 'Resume the garden (P)',
-    speed: 'Speed {n}× ',
-    settings: 'Settings',
-    close: 'Close',
-    remove: 'Remove tool (X)',
-    basketItem: 'Place {item} from the basket',
     cursorTile: '{what} at column {x}, row {y}',
     emptyTile: 'Empty grass',
+    skipToGarden: 'Skip to garden',
   },
   palette: {
-    hintPlace: 'Click grass to place it. R rotates. Esc cancels.',
-    hintBelt: 'Drag a path on grass. R rotates. Esc cancels.',
-    hintRemove: 'Click a structure to pick it up. Esc cancels.',
-    remove: 'Remove',
-    removeTooltip: 'Picks up a structure for a refund. Items on it go to the basket. (X)',
     refund: 'refund',
-    cost: '{cost} coins',
-    expand: 'Open Plot',
-    expandTooltip: 'Opens more grass to build on: the garden grows to 20 × 14. Costs {cost} coins. Permanent.',
-    basket: 'Basket',
-    basketHint: 'Items from removed structures. Click one, then an empty belt, to send it back out.',
     facing: 'facing {facing}',
     rotateHint: 'R to rotate',
     clickToPlace: 'click to place',
@@ -109,108 +127,67 @@ export const S = {
     beltCount: '1 belt · {cost} coins',
     removeWhat: 'Remove {name}',
     refundLine: 'refund {coins} coins',
-    nothingHere: 'Nothing here to remove',
+    staysInYard: 'The {name} stays in the yard.',
     placeItem: 'Place {item}',
     needsBelt: 'needs an empty belt',
     dropHere: 'click to drop it on this belt',
+    expandLine: 'The garden grows to 20 × 14. Permanent.',
   },
-  facing: ['up', 'right', 'down', 'left'] as const,
+  blocked: {
+    headOn: 'The belt ahead points back at this one. Turn one of them.',
+    stockFull: 'Blocked: plenty of those already',
+    stockFullDetail: 'The Packing Station is holding enough {item}. They move on when an order needs them.',
+  },
   states: {
-    growing: 'Growing',
-    ready: 'Ready',
-    processing: 'Processing',
-    waiting: 'Waiting for inputs',
-    waitingFor: 'Waiting for {count} {item}',
-    blocked: 'Blocked',
-    idle: 'Idle',
-    empty: 'Empty',
-    carrying: 'Carrying {item}',
-    heading: 'Heading {facing}.',
-    faces: 'Faces {facing}',
     movesEvery: 'Moves one tile every {seconds} s.',
-    packingWaiting: 'Waiting for a delivery',
-    packingReceiving: 'Receiving',
-    received: 'Received {count}',
-    stored: 'Spare stock (shared by every station)',
-    packingBody: 'Takes a delivery from any side. Counts go to the order. Nothing leaves.',
-    packingSandbox: 'In the open market, goods sell on arrival.',
-    packingCap: 'Holds up to {cap} spare of each kind.',
     growsEvery: '{item} every {seconds} s',
     outputLeaves: 'Output leaves {facing}.',
     takesAnySide: 'Takes ingredients from any side; output leaves {facing}.',
-    progress: '{elapsed}s of {total}s',
-  },
-  blocked: {
-    exitFull: 'Blocked: exit is full. This will move when a space opens.',
-    noExit: 'Blocked: nothing connected. Aim the output at a belt or a machine.',
-    headOn: 'Blocked: the belt ahead points back at this one.',
-    wrongItem: 'Blocked: {target} won’t take {item}.',
-    inputFull: 'Blocked: that input is full. Room opens when the craft finishes.',
-    beltEnd: 'Blocked: belt ends here. Extend the belt, or aim it into a machine.',
-    stockFull: 'Blocked: the Packing Station has plenty of {item} already.',
-    queue: 'Waiting for the belt ahead to clear.',
-    noticeBed: '{name} is blocked: {why}',
+    received: 'Received {count}',
+    readyCount: '{n} ready',
+    packingSandbox: 'With all orders done, goods sell on arrival.',
+    packingCap: 'Holds up to {cap} spare of each kind.',
+    refused: 'Refused {item}: not in this recipe, or that slot is full.',
   },
   inspector: {
-    recipe: 'Recipe · {seconds} s',
-    holding: 'Ingredients held',
-    readyCount: '{n} ready',
-    refused: 'Refused {item}: not in this recipe, or that slot is full.',
-    rotate: 'Rotate',
-    remove: 'Remove',
-    close: 'Close',
+    recipeSeconds: '{line} · {seconds} s',
+    holding: 'Holding',
     rotateTip: 'Rotate (R)',
     removeTip: 'Remove for a refund (Delete)',
   },
-  basket: {
-    hint: 'Click an item, then an empty belt, to send it back out.',
-  },
   celebration: {
-    complete: '{customer}’s order is packed.',
-    earned: 'Earned {coins} coins.',
-    unlockLine: 'Unlocked: {names}',
     expansionName: 'Open Plot',
+    unlockGeneric: 'You can build a {name} now.',
   },
   ending: {
-    title: 'Orders complete',
-    body: 'All six orders are packed and paid. The garden is still yours. Keep building, or let the belts run.',
-    button: 'Keep Building',
     ordersFilled: 'orders filled',
     itemsDelivered: 'items delivered',
     coinsEarned: 'coins earned',
-    market: 'From here on the market is open: anything you deliver sells for coins, and every tool is unlocked.',
-  },
-  expansion: {
-    opened: 'The far plot is open.',
   },
   tutorial: {
-    skip: 'Skip tips',
-    gotIt: 'Got it',
-    close: 'Close',
-    help: 'Tips',
-    keys: 'R rotate · Z undo · X remove · B build menu · Esc cancel · P pause · F speed · Home fit view · arrows move the cursor · Enter place',
+    helpTitle: 'Tips',
     mouse: 'Drag on empty grass or use the middle mouse button to pan. Scroll to zoom. Click any bed, belt, or machine for details.',
   },
-  controls: [
-    ['Left-click', 'Place or select'],
-    ['Drag', 'Lay belts (belt tool)'],
-    ['Right-click / Esc', 'Cancel'],
-    ['R / Shift+R', 'Rotate'],
-    ['Z', 'Undo build'],
+  errors: {
+    notRemovable: 'The {name} stays in the yard.',
+    packingNoFacing: 'The Packing Station takes deliveries from every side, so it has no direction.',
+    undoTaken: 'That tile is taken now, so nothing changed.',
+    undoFunds: 'Not enough coins to put that back.',
+    basketEmpty: 'The basket has none of those.',
+    expansionDone: 'The far plot is already open.',
+    expansionLocked: 'More garden opens later.',
+  },
+  controlsExtra: [
+    ['Arrows or WASD', 'Move the cursor'],
+    ['Enter or Space', 'Place or select at the cursor'],
+    ['Shift+R', 'Rotate the other way'],
     ['X', 'Remove tool'],
-    ['Delete', 'Remove selected'],
+    ['Delete', 'Remove the selected structure'],
     ['B', 'Build menu'],
-    ['P', 'Pause'],
-    ['F', 'Cycle speed'],
-    ['Arrows / WASD', 'Move cursor'],
-    ['Enter / Space', 'Place or select at cursor'],
-    ['= / -', 'Zoom'],
-    ['Home', 'Fit garden'],
-    ['Wheel', 'Zoom'],
-    ['Middle-drag', 'Pan'],
+    ['P', 'Pause or resume'],
+    ['F', 'Change speed'],
+    ['= and -', 'Zoom'],
+    ['Home', 'Fit the garden'],
+    ['H', 'Tips'],
   ] as const,
 };
-
-export function fmt(template: string, vars: Record<string, string | number>): string {
-  return template.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ''));
-}
