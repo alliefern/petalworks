@@ -193,14 +193,6 @@ export class PetalScene extends Phaser.Scene {
       const [x, y] = k.split(',').map(Number);
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) lawn.add(`${x + dx},${y + dy}`);
     }
-    // Open tiles sit above the fade so a fade stroke crossing a narrow bay never shows on
-    // buildable lawn; the apron and the closed preview sit below it and melt away.
-    for (const k of lawn) {
-      const [x, y] = k.split(',').map(Number);
-      const r = seeded(x, y);
-      put(`ground.grass.${r < 0.72 ? 0 : r < 0.84 ? 1 : r < 0.94 ? 2 : 3}`, x, y, openSet.has(k) ? DEPTH.ground + 0.4 : DEPTH.ground);
-    }
-
     // The organic border: traced around the open tiles, smoothed and wobbled, pushed a
     // little outward so the curve clears the buildable tiles' corners.
     const loops = organicOutline(openTiles, TILE, 7).map((l) => offset(l, TILE * 0.12));
@@ -208,23 +200,44 @@ export class PetalScene extends Phaser.Scene {
     // surroundings follows the *outer* edge (open + closed tiles) with the same curve;
     // with nothing closed, the fade sits on the hedge line itself.
     const future = closedTiles.length ? organicOutline([...openTiles, ...closedTiles], TILE, 7).map((l) => offset(l, TILE * 0.12)) : loops;
+
+    // How far past the outer curve the lawn is allowed to show before it is all linen.
+    const FADE_REACH = TILE * 0.9;
+    // The apron and the closed preview are square tiles, so they are clipped to a smooth
+    // outward offset of the curve: no tile-shaped step can ever show beyond it.
+    const maskGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    maskGfx.fillStyle(0xffffff, 1);
+    for (const loop of future) maskGfx.fillPoints(offset(loop, FADE_REACH), true);
+    const lawnMask = maskGfx.createGeometryMask();
+    this.lockedGfx.push(maskGfx);
+
+    // Open tiles sit above the fade so a fade stroke crossing a narrow bay never shows on
+    // buildable lawn; the apron and the closed preview sit below it and melt away.
+    for (const k of lawn) {
+      const [x, y] = k.split(',').map(Number);
+      const r = seeded(x, y);
+      const im = put(`ground.grass.${r < 0.72 ? 0 : r < 0.84 ? 1 : r < 0.94 ? 2 : 3}`, x, y, openSet.has(k) ? DEPTH.ground + 0.4 : DEPTH.ground);
+      if (!openSet.has(k)) im.setMask(lawnMask);
+    }
+
     const fade = this.add.graphics().setDepth(DEPTH.ground + 0.3);
     const border = this.add.graphics().setDepth(DEPTH.ground + 0.5);
     this.ground.sort((a, b) => a.depth - b.depth);
     for (const loop of future) {
-      // Soft fade from the outer edge out past the lawn apron: linen strokes along outward
-      // offsets of the curve, each a little stronger, so the lawn melts into the surroundings.
+      // Soft fade from the outer curve out to FADE_REACH: abutting linen strokes along
+      // outward offsets of the curve, with a smoothstep alpha so the lawn melts into the
+      // surroundings and is fully linen exactly where the lawn mask ends.
       // (Strokes, not ring triangles: offsets self-cross at tight bays and triangles would flip.)
-      const steps = 14;
-      const reach = TILE * 1.7;
+      const steps = 18;
+      const step = FADE_REACH / steps;
       for (let i = 1; i <= steps; i++) {
-        const d = (reach * i) / steps;
-        // Each stroke is wider than the spacing so neighbours overlap into one gradient.
-        fade.lineStyle((reach / steps) * 2.6, COLORS.linen, Math.min(1, 0.05 + (i / steps) ** 1.6 * 0.6));
-        fade.strokePoints(offset(loop, d), true, true);
+        const t = i / steps;
+        fade.lineStyle(step * 1.25, COLORS.linen, Math.min(1, t * t * (3 - 2 * t) + 0.02));
+        fade.strokePoints(offset(loop, step * (i - 0.5)), true, true);
       }
-      fade.lineStyle(TILE * 0.8, COLORS.linen, 1);
-      fade.strokePoints(offset(loop, reach + TILE * 0.35), true, true);
+      // Solid band past the mask edge so its anti-aliased rim and any stray sliver vanish.
+      fade.lineStyle(TILE * 0.7, COLORS.linen, 1);
+      fade.strokePoints(offset(loop, FADE_REACH + TILE * 0.3), true, true);
     }
     for (const loop of loops) {
       // One continuous painted border: a soft glow, the line, and a thin cream highlight.
