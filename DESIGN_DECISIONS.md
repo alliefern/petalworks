@@ -37,7 +37,7 @@ Left-click places/selects, drag lays belts, right-click or Esc cancels, R / Shif
 
 ## Audio
 
-Cues come from `assets/audio/` via the manifest's suggested gains. Nothing plays until the first click or key. Music, the machine hum and the belt cadence are single looping instances; the two factory loops stop while paused and music fades. `blocked` is edge-triggered after a block has lasted a second, and again if the reason changes. Order 6 plays `final_celebration` instead of `order_complete`.
+Cues come from `assets/audio/` via the manifest's suggested gains. Nothing plays until the first click or key. The background music is Allie's generative Sugar Belt soundtrack (`src/app/music.ts`, synthesized with Web Audio: music box, marimba, lo-fi keys and breathers over gentle progressions, modulating between keys), so no music file is downloaded; `assets/audio/music.*` stay as the audio team's source but are not loaded. The music bus sits at Sugar Belt's level under a gentle master compressor; `tools/music-check.mjs` renders it offline and checks peak, RMS and silences. The arrangement fills out with the factory (machines and items on belts raise the intensity). The machine hum and the belt cadence are single looping instances; they stop while paused and music fades to a third; a hidden tab suspends the audio context. `blocked` is edge-triggered after a block has lasted a second, and again if the reason changes. Order 6 plays `final_celebration` instead of `order_complete`.
 
 ## Copy
 

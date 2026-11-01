@@ -26,5 +26,5 @@ Honest list. Nothing here is disguised as finished.
 ## Platform
 - Desktop mouse and keyboard only. Touch is not implemented.
 - No service worker; the game needs its first load online (nothing is fetched after that).
-- Safari older than 18.4 falls back to MP3; the three loops (music, machine hum, belt cadence) may have a tiny seam there.
+- Safari older than 18.4 falls back to MP3; the two factory loops (machine hum, belt cadence) may have a tiny seam there. Music is generated, so it has no file or seam.
 - Playwright runs against the system Chrome at `/usr/bin/google-chrome`; it does not install its own browser.

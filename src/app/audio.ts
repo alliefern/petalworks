@@ -1,14 +1,20 @@
 /**
- * Audio: plays the cue set in assets/audio per AUDIO_MANIFEST.md. Ogg is preferred,
- * MP3 is the fallback for decoders without Vorbis. Nothing sounds until the first
- * user gesture unlocks Web Audio. Sound and music have separate persisted toggles.
+ * Audio: sound effects come from the cue set in assets/audio per AUDIO_MANIFEST.md (Ogg
+ * preferred, MP3 for decoders without Vorbis). Background music is Allie's generative
+ * Sugar Belt soundtrack (./music.ts), synthesized at runtime, so no music file is downloaded;
+ * assets/audio/music.* stay in the repo as the audio team's source but are not loaded.
+ * Nothing sounds until the first user gesture unlocks Web Audio. Sound and music have
+ * separate persisted toggles.
  */
-// The 90 s music loop ships only as the lighter re-encode below; the audio team's source stays in assets/audio.
+import { makeReverb, Music } from './music';
+
+// music.ogg/.mp3 are excluded: the soundtrack is generated, see above.
 const OGG = import.meta.glob(['../../assets/audio/*.ogg', '!**/music.ogg'], { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 const MP3 = import.meta.glob(['../../assets/audio/*.mp3', '!**/music.mp3'], { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-/** Lighter re-encodes of long cues (mono, lower bitrate), made by tools/encode-music.sh. Preferred when present. */
-const LITE_OGG = import.meta.glob('../assets/audio-lite/*.ogg', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-const LITE_MP3 = import.meta.glob('../assets/audio-lite/*.mp3', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+
+/** Music bus level (Sugar Belt's default: a 0.55 slider on a squared curve, times 0.9). */
+const MUSIC_LEVEL = 0.55 * 0.55 * 0.9;
+const MUSIC_PAUSED_SCALE = 0.35;
 
 export type CueKey =
   | 'ui_click'
@@ -27,8 +33,7 @@ export type CueKey =
   | 'order_complete'
   | 'unlock'
   | 'final_celebration'
-  | 'deliver'
-  | 'music';
+  | 'deliver';
 
 /** Suggested gains from the manifest. */
 const GAIN: Record<CueKey, number> = {
@@ -49,10 +54,9 @@ const GAIN: Record<CueKey, number> = {
   unlock: 0.68,
   final_celebration: 0.74,
   deliver: 0.48,
-  music: 0.42,
 };
 
-const LOOPS: CueKey[] = ['music', 'machine_working', 'belt_tick'];
+const LOOPS: CueKey[] = ['machine_working', 'belt_tick'];
 
 function findUrl(table: Record<string, string>, name: string): string | undefined {
   for (const [path, url] of Object.entries(table)) if (path.endsWith('/' + name)) return url;
@@ -64,6 +68,7 @@ export class AudioEngine {
   private master: GainNode | null = null;
   private sfxGain: GainNode | null = null;
   private musicGain: GainNode | null = null;
+  private musicTrack: Music | null = null;
   private buffers = new Map<CueKey, AudioBuffer>();
   private loading = new Map<CueKey, Promise<AudioBuffer | null>>();
   private loops = new Map<CueKey, { src: AudioBufferSourceNode; gain: GainNode }>();
@@ -90,19 +95,42 @@ export class AudioEngine {
       const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!Ctx) return;
       this.ctx = new Ctx();
+      // Master: a gentle compressor keeps the generated band and the cues from clipping.
+      const comp = this.ctx.createDynamicsCompressor();
+      comp.threshold.value = -16;
+      comp.ratio.value = 3;
+      comp.attack.value = 0.01;
+      comp.release.value = 0.25;
       this.master = this.ctx.createGain();
-      this.master.gain.value = 1;
-      this.master.connect(this.ctx.destination);
+      this.master.gain.value = 0.9;
+      this.master.connect(comp).connect(this.ctx.destination);
       this.sfxGain = this.ctx.createGain();
       this.sfxGain.gain.value = this.sound ? 1 : 0;
       this.sfxGain.connect(this.master);
+      // Music: Sugar Belt's generative band on its own bus with a soft reverb return.
       this.musicGain = this.ctx.createGain();
-      this.musicGain.gain.value = this.music ? 1 : 0;
+      this.musicGain.gain.value = 0;
       this.musicGain.connect(this.master);
+      const verb = makeReverb(this.ctx);
+      const verbReturn = this.ctx.createGain();
+      verbReturn.gain.value = 0.55;
+      verb.connect(verbReturn).connect(this.musicGain);
+      this.musicTrack = new Music(this.ctx, this.musicGain, (Math.random() * 2 ** 31) | 0, verb);
+      this.musicTrack.setCrackle(0.05);
+      this.musicTrack.nextBarTime = this.ctx.currentTime + 0.3;
+      window.setInterval(() => this.pump(), 90);
+      document.addEventListener('visibilitychange', () => {
+        if (!this.ctx) return;
+        if (document.hidden) void this.ctx.suspend();
+        else void this.ctx.resume();
+      });
       this.unlocked = true;
       void this.ctx.resume();
-      // Warm the common cues, then start the music bed.
-      void this.load('music').then(() => this.setLoop('music', true));
+      // Fade the band in instead of starting at full level.
+      if (this.music) {
+        this.musicGain.gain.setValueAtTime(0, this.ctx.currentTime);
+        this.musicGain.gain.linearRampToValueAtTime(MUSIC_LEVEL, this.ctx.currentTime + 4);
+      }
       for (const k of ['ui_click', 'build_place', 'ui_error', 'deliver', 'item_pop'] as CueKey[]) void this.load(k);
     } catch {
       this.ctx = null;
@@ -110,8 +138,43 @@ export class AudioEngine {
   }
 
   private url(key: CueKey): string | undefined {
-    if (this.useOgg) return findUrl(LITE_OGG, key + '.ogg') ?? findUrl(OGG, key + '.ogg') ?? findUrl(LITE_MP3, key + '.mp3') ?? findUrl(MP3, key + '.mp3');
-    return findUrl(LITE_MP3, key + '.mp3') ?? findUrl(MP3, key + '.mp3') ?? findUrl(LITE_OGG, key + '.ogg') ?? findUrl(OGG, key + '.ogg');
+    if (this.useOgg) return findUrl(OGG, key + '.ogg') ?? findUrl(MP3, key + '.mp3');
+    return findUrl(MP3, key + '.mp3') ?? findUrl(OGG, key + '.ogg');
+  }
+
+  /** Schedule the next bars of music a little ahead of time. Skips when muted to rest the CPU. */
+  private pump(): void {
+    if (!this.ctx || !this.musicTrack || !this.music || this.ctx.state !== 'running') return;
+    try {
+      let n = 0;
+      while (this.musicTrack.tick(0.9) && n++ < 4) {
+        /* schedule ahead */
+      }
+    } catch (e) {
+      console.warn('music', e);
+    }
+  }
+
+  private musicTarget(): number {
+    return this.music ? MUSIC_LEVEL * (this.paused ? MUSIC_PAUSED_SCALE : 1) : 0;
+  }
+
+  /** For tests and the console: is the band running, and where is it. */
+  musicDebug(): { state: string; bars: number; section: string | null; key: number | null; bpm: number | null; intensity: number | null; level: number } {
+    return {
+      state: this.ctx?.state ?? 'none',
+      bars: this.musicTrack?.barsPlayed ?? 0,
+      section: this.musicTrack?.section.kind ?? null,
+      key: this.musicTrack?.section.key ?? null,
+      bpm: this.musicTrack?.bpm ?? null,
+      intensity: this.musicTrack?.intensity ?? null,
+      level: this.musicGain?.gain.value ?? 0,
+    };
+  }
+
+  /** 0..1: a bigger, busier factory gets a fuller arrangement (drums, hats, shaker). */
+  setIntensity(v: number): void {
+    if (this.musicTrack) this.musicTrack.intensity = Math.max(0, Math.min(1, v));
   }
 
   private load(key: CueKey): Promise<AudioBuffer | null> {
@@ -144,17 +207,20 @@ export class AudioEngine {
   }
 
   setMusic(on: boolean): void {
+    const was = this.music;
     this.music = on;
-    if (this.musicGain && this.ctx) this.musicGain.gain.setTargetAtTime(on ? (this.paused ? 0.35 : 1) : 0, this.ctx.currentTime, 0.2);
-    if (on) this.setLoop('music', true);
-    else this.stopLoop('music');
+    if (!this.musicGain || !this.ctx) return;
+    this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.musicGain.gain.setTargetAtTime(this.musicTarget(), this.ctx.currentTime, 0.2);
+    // Coming back from mute: pick the band up from "now" rather than a stale bar time.
+    if (on && !was && this.musicTrack) this.musicTrack.nextBarTime = this.ctx.currentTime + 0.3;
   }
 
   /** Fade music down and stop the factory loops while paused. */
   setPaused(paused: boolean): void {
     if (paused === this.paused) return;
     this.paused = paused;
-    if (this.musicGain && this.ctx && this.music) this.musicGain.gain.setTargetAtTime(paused ? 0.35 : 1, this.ctx.currentTime, 0.25);
+    if (this.musicGain && this.ctx && this.music) this.musicGain.gain.setTargetAtTime(this.musicTarget(), this.ctx.currentTime, 0.25);
     if (paused) {
       this.stopLoop('machine_working');
       this.stopLoop('belt_tick');
@@ -165,7 +231,7 @@ export class AudioEngine {
 
   play(key: CueKey, opts: { throttleMs?: number; delay?: number } = {}): void {
     if (!this.ctx || !this.sfxGain) return;
-    if (key !== 'music' && !this.sound) return;
+    if (!this.sound) return;
     const now = performance.now();
     const throttle = opts.throttleMs ?? 40;
     if (now - (this.lastPlay.get(key) ?? -1e9) < throttle) return;
@@ -195,17 +261,17 @@ export class AudioEngine {
       return;
     }
     if (this.loops.has(key) || !this.ctx) return;
-    if (key === 'music' ? !this.music : !this.sound || this.paused) return;
+    if (!this.sound || this.paused) return;
     void this.load(key).then((buf) => {
       if (!buf || !this.ctx || this.loops.has(key) || !this.wantLoop.get(key)) return;
-      if (key === 'music' ? !this.music : !this.sound || this.paused) return;
+      if (!this.sound || this.paused) return;
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
       src.loop = true;
       const g = this.ctx.createGain();
       g.gain.value = GAIN[key];
       src.connect(g);
-      g.connect(key === 'music' ? this.musicGain! : this.sfxGain!);
+      g.connect(this.sfxGain!);
       src.start();
       this.loops.set(key, { src, gain: g });
     });
@@ -223,4 +289,62 @@ export class AudioEngine {
   }
 }
 
+/**
+ * Render the generated soundtrack offline and measure it (used by tools/music-check.mjs).
+ * Builds the same chain as unlock(): music bus level, reverb return, 0.9 master, compressor.
+ */
+export async function renderMusic(seconds: number, seed: number, intensity: number): Promise<{ peak: number; rms: number; clipped: number; silentSeconds: number; bars: number; bpm: number; kinds: string[] }> {
+  const sr = 44100;
+  const ctx = new OfflineAudioContext(2, Math.floor(sr * seconds), sr);
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -16;
+  comp.ratio.value = 3;
+  comp.attack.value = 0.01;
+  comp.release.value = 0.25;
+  const master = ctx.createGain();
+  master.gain.value = 0.9;
+  master.connect(comp).connect(ctx.destination);
+  const bus = ctx.createGain();
+  bus.gain.value = MUSIC_LEVEL;
+  bus.connect(master);
+  const verb = makeReverb(ctx);
+  const ret = ctx.createGain();
+  ret.gain.value = 0.55;
+  verb.connect(ret).connect(bus);
+  const m = new Music(ctx, bus, seed, verb);
+  m.setCrackle(0.05);
+  m.intensity = intensity;
+  const kinds: string[] = [];
+  let t = 0.3;
+  let bars = 0;
+  let lastSection = -1;
+  while (t < seconds) {
+    if (m.sectionCount !== lastSection) {
+      kinds.push(m.section.kind);
+      lastSection = m.sectionCount;
+    }
+    m.scheduleBar(t);
+    t += m.barLen;
+    bars++;
+  }
+  const buf = await ctx.startRendering();
+  let peak = 0;
+  let sum = 0;
+  let clipped = 0;
+  const n = buf.length;
+  const silent = new Array(Math.ceil(seconds)).fill(true);
+  for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < n; i++) {
+      const a = Math.abs(d[i]);
+      if (a > peak) peak = a;
+      if (a >= 0.999) clipped++;
+      sum += d[i] * d[i];
+      if (a > 0.004) silent[Math.floor(i / sr)] = false;
+    }
+  }
+  return { peak, rms: Math.sqrt(sum / (n * buf.numberOfChannels)), clipped, silentSeconds: silent.filter(Boolean).length, bars, bpm: m.bpm, kinds };
+}
+
 export const audio = new AudioEngine();
+if (typeof window !== 'undefined') (window as unknown as { petalworksAudio?: unknown }).petalworksAudio = { audio, renderMusic };

@@ -355,13 +355,22 @@ export class GameStore {
   private updateLoops(): void {
     let working = false;
     let riding = false;
+    let machines = 0;
+    let items = 0;
     for (const s of Object.values(this.sim.world.structures)) {
-      if (s.processor?.workTicks !== null && s.processor !== undefined) working = true;
-      if (s.belt?.item) riding = true;
-      if (working && riding) break;
+      if (s.processor !== undefined) {
+        machines++;
+        if (s.processor.workTicks !== null) working = true;
+      }
+      if (s.belt?.item) {
+        riding = true;
+        items++;
+      }
     }
     audio.setLoop('machine_working', working);
     audio.setLoop('belt_tick', riding);
+    // A busier factory gets a fuller arrangement: from a quiet music box to brushes and shaker.
+    audio.setIntensity(0.15 + machines * 0.1 + items * 0.02);
   }
 
   /** Run the sim forward by N ticks instantly (used by the e2e harness). */
