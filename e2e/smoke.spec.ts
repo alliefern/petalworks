@@ -217,4 +217,115 @@ test.describe('Petalworks smoke', () => {
     await expect(page.getByTestId('order')).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem('petalworks.save.backup'))).toContain('nope');
   });
+
+  test('the Open Plot label stays on screen and clear of the side cards', async ({ page }) => {
+    await startFresh(page);
+    await page.evaluate(async () => {
+      (window as any).petalworks.sim.world.expansionUnlocked = true;
+      await document.fonts.ready;
+    });
+    const sizes = [
+      { width: 1024, height: 640 },
+      { width: 1280, height: 800 },
+      { width: 1366, height: 768 },
+    ];
+    for (const size of sizes) {
+      await page.setViewportSize(size);
+      await settleGarden(page, size);
+      await expectLockedLabelClear(page, size, 'resize');
+      await page.keyboard.press('Home');
+      await settleGarden(page, size);
+      await expectLockedLabelClear(page, size, 'fit');
+    }
+  });
 });
+
+async function settleGarden(page: Page, size: { width: number; height: number }): Promise<void> {
+  await page.waitForFunction(
+    (viewport) => {
+      const cam = (window as any).__cam;
+      return !!cam && Math.abs(cam.width - viewport.width) < 2 && Math.abs(cam.height - viewport.height) < 2;
+    },
+    size,
+  );
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve(null))));
+      }),
+  );
+}
+
+interface LabelReport {
+  visible: boolean;
+  text: string;
+  anchorOnScreen: boolean;
+  anchorX: number;
+  anchorY: number;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+async function lockedLabelReport(page: Page, size: { width: number; height: number }): Promise<LabelReport | null> {
+  return page.evaluate((viewport) => {
+    const cam = (window as any).__cam;
+    const t = cam?.scene?.lockedText?.[0];
+    if (!t) return null;
+    const zoom = cam.zoom || 1;
+    const homeX = (t.getData('homeX') as number | undefined) ?? t.x;
+    const homeY = (t.getData('homeY') as number | undefined) ?? t.y;
+    const ax = (homeX - cam.worldView.x) * zoom;
+    const ay = (homeY - cam.worldView.y) * zoom;
+    const cx = (t.x - cam.worldView.x) * zoom;
+    const cy = (t.y - cam.worldView.y) * zoom;
+    const w = t.displayWidth * zoom;
+    const h = t.displayHeight * zoom;
+    return {
+      visible: !!t.visible,
+      text: String(t.text),
+      anchorOnScreen: ax >= 0 && ay >= 0 && ax <= viewport.width && ay <= viewport.height,
+      anchorX: ax,
+      anchorY: ay,
+      left: cx - w / 2,
+      top: cy - h / 2,
+      right: cx + w / 2,
+      bottom: cy + h / 2,
+    };
+  }, size);
+}
+
+/** A shown label must sit fully inside the window and not under a HUD card. */
+async function expectLockedLabelClear(page: Page, size: { width: number; height: number }, when: string): Promise<void> {
+  await page.waitForFunction(() => ((window as any).__cam?.scene?.lockedText?.length ?? 0) > 0);
+  const report = await lockedLabelReport(page, size);
+  expect(report, `${when} ${size.width}x${size.height}`).toBeTruthy();
+  if (!report) return;
+  const where = `${when} ${size.width}x${size.height} ${JSON.stringify(report)}`;
+  if (!report.visible) {
+    expect(report.anchorOnScreen, where).toBe(false);
+    return;
+  }
+  expect(report.text, where).toContain('Open Plot');
+  expect(report.text, where).toContain('100');
+  expect(report.left, where).toBeGreaterThanOrEqual(-1);
+  expect(report.top, where).toBeGreaterThanOrEqual(-1);
+  expect(report.right, where).toBeLessThanOrEqual(size.width + 1);
+  expect(report.bottom, where).toBeLessThanOrEqual(size.height + 1);
+  const cards = await page.evaluate(() => {
+    const found: Record<string, { x: number; y: number; w: number; h: number }> = {};
+    for (const sel of ['.orderpanel', '.tutorial', '.inspector', '.palette', '.topbar']) {
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 2 || rect.height < 2) continue;
+      found[sel] = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+    }
+    return found;
+  });
+  for (const [sel, card] of Object.entries(cards)) {
+    const overlaps = report.left < card.x + card.w - 1 && report.right > card.x + 1 && report.top < card.y + card.h - 1 && report.bottom > card.y + 1;
+    expect(overlaps, `${where} overlaps ${sel} ${JSON.stringify(card)}`).toBe(false);
+  }
+}

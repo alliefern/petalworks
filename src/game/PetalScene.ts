@@ -9,6 +9,7 @@ import { DX, DY, dirBetween, isOpenTile, opposite, rotateCCW, rotateCW } from '.
 import type { Dir, SimEvent, Structure, World } from '../sim/types';
 import { CameraController } from './camera';
 import { COLORS, DEPTH, TILE } from './constants';
+import { placeLabelInView, type ScreenBox } from './labelPlace';
 import { DISC_SIZE, makeOverlayTextures } from './overlays';
 import { beltProgressT, itemPositionOnBelt, tileCenter } from './paths';
 import { SpriteRegistry } from './sprites';
@@ -206,6 +207,8 @@ export class PetalScene extends Phaser.Scene {
           })
           .setOrigin(0.5)
           .setDepth(DEPTH.ground + 0.7);
+        label.setData('homeX', lx);
+        label.setData('homeY', ly);
         this.lockedText.push(label);
       }
     }
@@ -449,9 +452,8 @@ export class PetalScene extends Phaser.Scene {
       this.selectRing.setVisible(true).setPosition(c.x, c.y);
     } else this.selectRing.setVisible(false);
 
-    // Keep the closed-field label a readable screen size at any zoom.
-    const invZoom = 1 / this.cameras.main.zoom;
-    for (const t of this.lockedText) t.setScale(invZoom);
+    // Readable at any zoom, and fully on screen, clear of the side cards.
+    this.placeLockedLabels();
 
     if (ui.cursor) {
       const c = tileCenter(ui.cursor.x, ui.cursor.y);
@@ -521,6 +523,46 @@ export class PetalScene extends Phaser.Scene {
         this.hoverRing.setVisible(true).setPosition(c.x, c.y).setAlpha(ok ? 0.95 : 0.4);
       }
     }
+  }
+
+  /**
+   * The closed-field label is anchored on the east plot. Keep the whole label on
+   * screen and clear of the HUD cards, and hide it when the anchor has scrolled away.
+   */
+  private placeLockedLabels(): void {
+    if (!this.lockedText.length) return;
+    const cam = this.cameras.main;
+    const zoom = cam.zoom || 1;
+    const view = cam.worldView;
+    const screen = { w: this.scale.width, h: this.scale.height };
+    const cards = this.labelCards();
+    for (const t of this.lockedText) {
+      t.setScale(1 / zoom);
+      const homeX = (t.getData('homeX') as number | undefined) ?? t.x;
+      const homeY = (t.getData('homeY') as number | undefined) ?? t.y;
+      const anchor = { x: (homeX - view.x) * zoom, y: (homeY - view.y) * zoom };
+      const placed = placeLabelInView(anchor, { w: t.displayWidth * zoom, h: t.displayHeight * zoom }, screen, cards);
+      if (!placed) {
+        t.setVisible(false);
+        continue;
+      }
+      t.setVisible(true).setPosition(view.x + placed.x / zoom, view.y + placed.y / zoom);
+    }
+  }
+
+  /** HUD cards the closed-field label must not sit under. */
+  private labelCards(): ScreenBox[] {
+    const cards: ScreenBox[] = [];
+    for (const sel of ['.orderpanel', '.tutorial', '.inspector', '.palette', '.topbar']) {
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const style = getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 2 || rect.height < 2) continue;
+      cards.push({ left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom });
+    }
+    return cards;
   }
 
   // ---- blocked labels (near the building, not a banner) ------------------------------------
