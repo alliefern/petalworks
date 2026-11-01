@@ -14,6 +14,23 @@
 - Autosave, Continue / New Game with confirmation, corrupted-save backup, schema v2 with a v1 migration.
 - Default zoom keeps tiles at least 48 px; at 1366×768 the garden sits between the tip card and the order card instead of under them; the fit re-runs on window resize (Steam-plan guardrail).
 
+## Round of Nov 1, 19:46 (performance follow-ups + playthrough)
+- **Unchanged belt views are skipped per frame.** Each belt keeps a signature (frame, facing, feeders, layout version) and only re-applies textures when it changes; feeder lookups are cached until a build action bumps `layoutVersion`; sizes/positions are set once per structure; the exit arrow is only moved when facing or zoom changes.
+- **Cheaper HUD subscription.** Sim ticks mark the HUD dirty and it re-renders at most ~5 times a second (notable events such as a delivery, a craft or an order still render on the same frame). UI actions render immediately as before.
+- **Fonts subset to the glyphs the game can show** (227 glyphs, `tools/subset-fonts.py`, committed as woff2): 502 KB of TTF → 51 KB of woff2.
+- **Lighter music.** The audio team's `assets/audio/music.ogg` stays untouched as the source; `tools/encode-music.sh` writes a mono, lower-bitrate copy to `src/assets/audio-lite/` (committed) and the game streams that one: 1.03 MB → 336 KB on the first click (MP3 fallback 1.40 MB → 721 KB). The full-size copies are no longer in the deploy.
+- Slimmer Phaser build: left alone, as asked.
+
+| | Before (audit) | After atlas (19:30) | After follow-ups |
+| --- | --- | --- | --- |
+| Bytes before New Game works | 4.47 MB | 1.43 MB | 1.09 MB |
+| New Game clickable, Slow 4G | 23.0 s | 7.8 s | 6.5 s |
+| Fonts on the wire (raw) | 376 KB (3 TTF) | 376 KB | 38 KB (3 woff2) |
+| Music on the first click | 1.03 MB | 1.03 MB | 336 KB |
+| Deploy size (`dist/`) | 10.19 MB | 6.29 MB | 4.47 MB |
+
+- Scripted playthrough (`tools/playthrough.mjs`, real clicks through qa/playthrough-checklist.md) runs at 1280×800 and 1024×640; results below once the run is clean.
+
 ## Round of Nov 1, 19:30 (performance, from docs/research/PERFORMANCE.md)
 - **Build-time WebP atlas.** `tools/pack-art.mjs` runs before dev, test and build (`sharp`). It reads `assets/art/*.png` by file name (a missing name falls back to `assets/interim/`), packs the garden sprites into one 2048×1472 WebP sheet (quality 82, 2 px extruded edges so nothing bleeds) and writes single WebP files for the toolbar icons. The PNGs stay the source of truth; Allie's redesign still drops in by name. Output lives in `src/generated/` (ignored by git). `ground.locked` is no longer preloaded. The interim PNGs are no longer in the deploy.
 - **Loading bar.** The title shows "Loading the garden… 43%" while Phaser preloads; New Game enables when it is done.

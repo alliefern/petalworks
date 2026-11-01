@@ -82,6 +82,9 @@ export interface UiState {
 
 type Listener = () => void;
 
+/** Sim events that should reach the HUD on the same frame rather than the throttled tick. */
+const NOTABLE = new Set<SimEvent['type']>(['delivered', 'order_progress', 'order_complete', 'unlocked', 'all_orders_complete', 'blocked', 'crafted', 'item_spawned']);
+
 /** One-line block message (label + detail) in copy.json's words. */
 export function blockText(reason: BlockReason, item?: ItemKind | null, target?: string, onBelt = false): string {
   const c = blockCopy(reason, { item, target, onBelt });
@@ -138,6 +141,10 @@ export class GameStore {
   /** Interpolation factor between the last tick and the next (0..1). */
   alpha = 0;
   version = 0;
+  /** Bumped whenever structures are placed, removed or rotated (renderer caches hang off it). */
+  layoutVersion = 0;
+  private uiDirty = false;
+  private lastUiEmit = 0;
   /** Events produced since the renderer last drained them. */
   pendingEvents: SimEvent[] = [];
   private listeners = new Set<Listener>();
@@ -197,7 +204,15 @@ export class GameStore {
 
   private emit(): void {
     this.version++;
+    this.uiDirty = false;
+    this.lastUiEmit = typeof performance !== 'undefined' ? performance.now() : 0;
     for (const fn of this.listeners) fn();
+  }
+
+  /** Ticks mark the HUD dirty; it re-renders at most ~5 times a second unless something notable happened. */
+  private emitThrottled(now: number): void {
+    if (now - this.lastUiEmit >= 200) this.emit();
+    else this.uiDirty = true;
   }
 
   setUi(patch: Partial<UiState>): void {
@@ -237,6 +252,7 @@ export class GameStore {
       keyPathActive: false,
     };
     this.acc = 0;
+    this.layoutVersion++;
     this.applyAudioSettings();
     this.save();
     this.start();
@@ -271,6 +287,7 @@ export class GameStore {
       keyPathActive: false,
     };
     this.acc = 0;
+    this.layoutVersion++;
     this.applyAudioSettings();
     this.start();
     this.emit();
@@ -313,10 +330,12 @@ export class GameStore {
     if (!held) {
       this.acc += dtMs * this.ui.speed;
       let ticked = false;
+      let notable = false;
       let guard = 0;
       while (this.acc >= TICK_MS && guard++ < 60) {
         this.acc -= TICK_MS;
         const events = this.sim.step();
+        if (events.some((e) => NOTABLE.has(e.type))) notable = true;
         this.handleEvents(events);
         ticked = true;
       }
@@ -324,9 +343,11 @@ export class GameStore {
       this.ui.simTimeMs = this.sim.world.tick * TICK_MS + this.acc;
       if (ticked) {
         this.updateLoops();
-        this.emit();
+        if (notable) this.emit();
+        else this.emitThrottled(now);
       }
     }
+    if (this.uiDirty && now - this.lastUiEmit >= 200) this.emit();
     this.pruneNotices();
     if (now - this.lastAutosave > 10_000) this.save();
   }
@@ -345,6 +366,7 @@ export class GameStore {
 
   /** Run the sim forward by N ticks instantly (used by the e2e harness). */
   fastForward(ticks: number): void {
+    this.layoutVersion++;
     for (let i = 0; i < ticks; i++) this.handleEvents(this.sim.step());
     this.ui.simTimeMs = this.sim.world.tick * TICK_MS;
     this.emit();
@@ -419,6 +441,7 @@ export class GameStore {
     const result = this.sim.dispatch(action, events);
     this.handleEvents(events);
     if (result.ok) {
+      if (action.type !== 'basket_drop') this.layoutVersion++;
       switch (action.type) {
         case 'place':
         case 'place_belt_path':

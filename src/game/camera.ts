@@ -15,8 +15,6 @@ export class CameraController {
   padTop = 60;
   padBottom = 118;
   padBottomCollapsed = 56;
-  /** Width of the tip/inspector column (left) and order card (right). Reserved when the window is wide enough. */
-  sidePanel = 276;
   /** Last framing request, re-run on resize. */
   lastMode: 'yard' | 'used' = 'used';
   lastUsed: { x: number; y: number; w: number; h: number } | null = null;
@@ -51,6 +49,13 @@ export class CameraController {
     return this.fitRect(used.x * TILE, used.y * TILE, used.w * TILE, used.h * TILE, paletteOpen, true);
   }
 
+  /** Width of the tip/order cards at this window width (mirrors src/ui/styles.css). */
+  private cardWidth(vw: number): number {
+    if (vw <= 1050) return 212;
+    if (vw <= 1150) return 232;
+    return 264;
+  }
+
   reframe(paletteOpen: boolean): { collapsePalette: boolean } {
     if (this.lastMode === 'used' && this.lastUsed) return this.frameUsed(this.lastUsed, paletteOpen);
     return this.fit(paletteOpen);
@@ -61,8 +66,9 @@ export class CameraController {
     const vh = this.scene.scale.height;
     const w = rw + TILE * 0.2;
     const h = rh + TILE * 0.2;
-    // Keep the garden out from under the side cards when there is room for 48 px tiles that way.
-    const gutters = vw - 2 * this.sidePanel >= w * (MIN_DEFAULT_TILE / TILE) ? this.sidePanel : 0;
+    // Frame inside the column between the side cards (card widths follow the CSS breakpoints),
+    // so the framed area never sits under the tip or order card. The 40 px floor still wins.
+    const gutters = this.cardWidth(vw) + 16;
     const zoomFor = (padBottom: number) => Math.min((vw - 2 * gutters) / w, (vh - this.padTop - padBottom) / h);
     let collapse = false;
     let padBottom = paletteOpen ? this.padBottom : this.padBottomCollapsed;

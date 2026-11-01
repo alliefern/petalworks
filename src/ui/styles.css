@@ -1,7 +1,7 @@
-@font-face { font-family: 'Nunito'; font-weight: 400; src: url('./fonts/Nunito-400.ttf') format('truetype'); font-display: swap; }
-@font-face { font-family: 'Nunito'; font-weight: 600; src: url('./fonts/Nunito-600.ttf') format('truetype'); font-display: swap; }
-@font-face { font-family: 'Nunito'; font-weight: 700; src: url('./fonts/Nunito-700.ttf') format('truetype'); font-display: swap; }
-@font-face { font-family: 'Nunito'; font-weight: 800; src: url('./fonts/Nunito-800.ttf') format('truetype'); font-display: swap; }
+@font-face { font-family: 'Nunito'; font-weight: 400; src: url('./fonts/Nunito-400.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Nunito'; font-weight: 600; src: url('./fonts/Nunito-600.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Nunito'; font-weight: 700; src: url('./fonts/Nunito-700.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Nunito'; font-weight: 800; src: url('./fonts/Nunito-800.woff2') format('woff2'); font-display: swap; }
 
 :root {
   --cream: #f6ebd5;

@@ -22,6 +22,14 @@ interface StructureView {
   arrow: Phaser.GameObjects.Image;
   pennant: Phaser.GameObjects.Image;
   disc: Phaser.GameObjects.Image;
+  /** Signature of the last applied belt appearance (frame, shape, endcap); unchanged belts are skipped. */
+  beltSig: string;
+  /** Cached feeder directions and the layout version they were computed for. */
+  feeders: Dir[];
+  feedersAt: number;
+  /** Facing the arrow was last placed for. */
+  arrowFacing: number;
+  sized: boolean;
 }
 
 interface ItemView {
@@ -290,12 +298,21 @@ export class PetalScene extends Phaser.Scene {
     pennant.setDisplaySize(TILE * 0.5, TILE * 0.5);
     const disc = this.add.image(c.x, c.y, 'disc.blocked').setVisible(false).setDepth(DEPTH.badge + 1);
     disc.setDisplaySize(DISC_SIZE, DISC_SIZE);
-    const v: StructureView = { id: s.id, main, endcap, arrow, pennant, disc };
+    const v: StructureView = { id: s.id, main, endcap, arrow, pennant, disc, beltSig: '', feeders: [], feedersAt: -1, arrowFacing: -1, sized: false };
     if (!this.store.reducedMotion) {
       main.setScale(0.6);
       this.tweens.add({ targets: main, scaleX: 1, scaleY: 1, duration: 220, ease: 'Back.easeOut' });
     }
     return v;
+  }
+
+  private feedersCached(v: StructureView, s: Structure): Dir[] {
+    const lv = this.store.layoutVersion;
+    if (v.feedersAt !== lv) {
+      v.feeders = this.feeders(s);
+      v.feedersAt = lv;
+    }
+    return v.feeders;
   }
 
   private feeders(s: Structure): Dir[] {
@@ -329,8 +346,15 @@ export class PetalScene extends Phaser.Scene {
 
   private updateView(v: StructureView, s: Structure, world: World, simTime: number): void {
     const c = tileCenter(s.x, s.y);
-    v.main.setPosition(c.x, c.y);
     const def = STRUCTURES[s.kind];
+    if (!v.sized) {
+      // Structures never move and each role has one size: set these once.
+      v.main.setPosition(c.x, c.y);
+      v.endcap.setPosition(c.x, c.y);
+      if (s.kind === 'belt') v.main.setDisplaySize(TILE, TILE).setDepth(DEPTH.belt);
+      else v.main.setDisplaySize(STRUCTURE_SIZE, STRUCTURE_SIZE).setDepth(DEPTH.structure + s.y * 0.01);
+      v.sized = true;
+    }
     const tick = world.tick;
     const reduced = this.store.reducedMotion;
     let disc: string | null = null;
@@ -338,26 +362,29 @@ export class PetalScene extends Phaser.Scene {
 
     if (s.kind === 'belt') {
       const frame = reduced ? 0 : Math.floor((simTime / 100) * BELT_FRAME_RATE) % 8;
-      const feeders = this.feeders(s);
-      const behind = opposite(s.facing);
-      const left = rotateCCW(s.facing);
-      const right = rotateCW(s.facing);
-      let key: string;
-      let angle: number;
-      if (feeders.includes(behind) || feeders.length === 0 || (feeders.includes(left) && feeders.includes(right))) {
-        key = `belt.straight.${frame}`;
-        angle = FACING_ANGLE[s.facing];
-      } else if (feeders.includes(right)) {
-        key = `belt.corner.cw.${frame}`;
-        angle = (s.facing - 2) * 90;
-      } else {
-        key = `belt.corner.ccw.${frame}`;
-        angle = s.facing * 90;
+      const feeders = this.feedersCached(v, s);
+      const sig = `${frame}|${s.facing}|${feeders.join('')}|${this.store.layoutVersion}`;
+      if (sig !== v.beltSig) {
+        v.beltSig = sig;
+        const behind = opposite(s.facing);
+        const left = rotateCCW(s.facing);
+        const right = rotateCW(s.facing);
+        let key: string;
+        let angle: number;
+        if (feeders.includes(behind) || feeders.length === 0 || (feeders.includes(left) && feeders.includes(right))) {
+          key = `belt.straight.${frame}`;
+          angle = FACING_ANGLE[s.facing];
+        } else if (feeders.includes(right)) {
+          key = `belt.corner.cw.${frame}`;
+          angle = (s.facing - 2) * 90;
+        } else {
+          key = `belt.corner.ccw.${frame}`;
+          angle = s.facing * 90;
+        }
+        this.setImage(v.main, key, angle);
+        const ahead = this.store.sim.at(s.x + DX[s.facing], s.y + DY[s.facing]);
+        v.endcap.setVisible(!ahead).setAngle(FACING_ANGLE[s.facing]);
       }
-      this.setImage(v.main, key, angle);
-      v.main.setDisplaySize(TILE, TILE).setDepth(DEPTH.belt);
-      const ahead = this.store.sim.at(s.x + DX[s.facing], s.y + DY[s.facing]);
-      v.endcap.setVisible(!ahead).setPosition(c.x, c.y).setAngle(FACING_ANGLE[s.facing]);
       const st = s.belt!;
       if (st.item && st.stuckTicks > 8 && st.block !== 'queue' && st.block !== 'none') {
         disc = st.block === 'wrong_item' ? 'disc.wrong' : 'disc.blocked';
@@ -368,7 +395,6 @@ export class PetalScene extends Phaser.Scene {
       const ratio = p.growTicks / def.growTicks!;
       const state: BedState = p.output ? 'ready' : ratio < 0.34 ? 'empty' : ratio < 0.7 ? 'grow0' : 'grow1';
       this.setImage(v.main, bedKey(s.kind, s.facing, state));
-      v.main.setDisplaySize(STRUCTURE_SIZE, STRUCTURE_SIZE).setDepth(DEPTH.structure + s.y * 0.01);
       if (p.blockedTicks > 3) {
         disc = 'disc.blocked';
         pennant = 'badge.blocked';
@@ -385,7 +411,6 @@ export class PetalScene extends Phaser.Scene {
       } else if (m.outputs.length > 0) state = 'ready';
       else state = 'idle';
       this.setImage(v.main, machineKey(s.kind, s.facing, state));
-      v.main.setDisplaySize(STRUCTURE_SIZE, STRUCTURE_SIZE).setDepth(DEPTH.structure + s.y * 0.01);
       if (m.blockedTicks > 3) {
         disc = 'disc.blocked';
         pennant = 'badge.blocked';
@@ -407,14 +432,17 @@ export class PetalScene extends Phaser.Scene {
         state = reduced ? (since < 3 ? 'receive0' : 'idle') : (`receive${Math.min(3, Math.floor(since / 2))}` as typeof state);
       }
       this.setImage(v.main, packingKey(state));
-      v.main.setDisplaySize(STRUCTURE_SIZE, STRUCTURE_SIZE).setDepth(DEPTH.structure + s.y * 0.01);
     }
 
     // Ink exit arrow on the facing edge of everything that outputs (constant 14×12 CSS px).
     if (def.hasFacing) {
       const d = s.facing;
       const inv = 1 / this.cameras.main.zoom;
-      v.arrow.setVisible(true).setPosition(c.x + DX[d] * (TILE / 2 - 7 * inv), c.y + DY[d] * (TILE / 2 - 7 * inv)).setAngle(FACING_ANGLE[d]).setDisplaySize(14 * inv, 12 * inv);
+      const arrowKey = d * 1000 + Math.round(inv * 100);
+      if (v.arrowFacing !== arrowKey) {
+        v.arrowFacing = arrowKey;
+        v.arrow.setVisible(true).setPosition(c.x + DX[d] * (TILE / 2 - 7 * inv), c.y + DY[d] * (TILE / 2 - 7 * inv)).setAngle(FACING_ANGLE[d]).setDisplaySize(14 * inv, 12 * inv);
+      }
     } else v.arrow.setVisible(false);
 
     this.placeBadge(v, c, disc, pennant, simTime);

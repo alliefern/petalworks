@@ -3,8 +3,12 @@
  * MP3 is the fallback for decoders without Vorbis. Nothing sounds until the first
  * user gesture unlocks Web Audio. Sound and music have separate persisted toggles.
  */
-const OGG = import.meta.glob('../../assets/audio/*.ogg', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-const MP3 = import.meta.glob('../../assets/audio/*.mp3', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+// The 90 s music loop ships only as the lighter re-encode below; the audio team's source stays in assets/audio.
+const OGG = import.meta.glob(['../../assets/audio/*.ogg', '!**/music.ogg'], { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const MP3 = import.meta.glob(['../../assets/audio/*.mp3', '!**/music.mp3'], { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+/** Lighter re-encodes of long cues (mono, lower bitrate), made by tools/encode-music.sh. Preferred when present. */
+const LITE_OGG = import.meta.glob('../assets/audio-lite/*.ogg', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const LITE_MP3 = import.meta.glob('../assets/audio-lite/*.mp3', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 
 export type CueKey =
   | 'ui_click'
@@ -106,7 +110,8 @@ export class AudioEngine {
   }
 
   private url(key: CueKey): string | undefined {
-    return (this.useOgg ? findUrl(OGG, key + '.ogg') : undefined) ?? findUrl(MP3, key + '.mp3') ?? findUrl(OGG, key + '.ogg');
+    if (this.useOgg) return findUrl(LITE_OGG, key + '.ogg') ?? findUrl(OGG, key + '.ogg') ?? findUrl(LITE_MP3, key + '.mp3') ?? findUrl(MP3, key + '.mp3');
+    return findUrl(LITE_MP3, key + '.mp3') ?? findUrl(MP3, key + '.mp3') ?? findUrl(LITE_OGG, key + '.ogg') ?? findUrl(OGG, key + '.ogg');
   }
 
   private load(key: CueKey): Promise<AudioBuffer | null> {

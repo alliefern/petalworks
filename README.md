@@ -19,6 +19,9 @@ node tools/soak.mjs http://127.0.0.1:4173/ 120   # headless soak: full layout at
 npm run art:interim  # regenerate the interim sprite set (Python 3 + Pillow)
 npm run art:pack     # pack assets/art PNGs into WebP atlases in src/generated/ (runs automatically before dev, test and build)
 node tools/firstload.mjs http://127.0.0.1:4173/   # bytes and seconds until New Game works at Slow 4G
+node tools/playthrough.mjs 1280 800              # scripted pass over qa/playthrough-checklist.md with real clicks (needs preview running)
+python3 tools/subset-fonts.py                     # regenerate the woff2 font subsets after text changes (fonttools + brotli)
+tools/encode-music.sh                             # regenerate the lighter music copy from assets/audio/music.ogg (ffmpeg)
 ```
 
 Playwright uses the system Chrome at `/usr/bin/google-chrome` by default. Point `CHROME_PATH` at another Chromium build if needed, or run `npx playwright install chromium` and remove `executablePath` from `playwright.config.ts`.
