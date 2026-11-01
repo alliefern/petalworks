@@ -10,7 +10,7 @@ Tone to keep if you edit a line: warm, plain, a little wry. Short enough for a b
 
 ## How to drop this in
 
-- Replace `{token}` with a value. Tokens in this file: `{coins}`, `{cost}`, `{count}`, `{current}`, `{total}`, `{have}`, `{need}`, `{item}`, `{takes}`, `{machine}`, `{target}`, `{facing}`, `{elapsed}`, `{seconds}`, `{customer}`, `{short}`, `{note}`, `{summary}`. Speed is the word Fast. There is no multiplier in the copy.
+- Replace `{token}` with a value. Tokens in this file: `{coins}`, `{cost}`, `{count}`, `{current}`, `{total}`, `{have}`, `{need}`, `{item}`, `{takes}`, `{machine}`, `{target}`, `{facing}`, `{elapsed}`, `{seconds}`, `{customer}`, `{short}`, `{note}`, `{summary}`, `{n}`, `{done}`, `{what}`, `{x}`, `{y}`, `{name}`, `{cap}`, `{line}`. Speed buttons show `{n}×`. The Fast tooltip still says Fast.
 - Plurals: `items.*.one` when the count is exactly 1, otherwise `items.*.other`. Lavender uses "Lavender" for both.
 - Facing shown to the player is a screen direction: `n` up, `e` right, `s` down, `w` left. "Faces right."
 - Times and prices come from the sim data. Copy never hardcodes 4 seconds or a coin price.
@@ -102,7 +102,7 @@ The tip text is the tutorial prompts further down. Do not write a second set.
 | Run faster | Fast button | `controls[fast]` |
 | Move through buttons | Tab, then Enter | `controls[menus]` |
 
-No key is listed that the game does not implement. Pause and Fast are buttons unless you bind keys, in which case update these rows.
+No key is listed that the game does not implement. Pause and Fast are buttons unless you bind keys, in which case update these rows. Keyboard rows beyond this table are under Leftover UI strings (`extra.controlsExtra`).
 
 ## Top bar
 
@@ -471,3 +471,149 @@ Drop `place-packing` if a Packing Station is already on the grass at the start.
 | `bouquet` | `order6`, Ada | Ada wants 1 Mixed Bouquet. Give an Arrangement Table one Daisy Bundle and one Lavender Sachet, then belt it to the Packing Station. |
 
 `tutorial.contextual.*.orderId` matches the order key.
+
+## Leftover UI strings
+
+These lived in `EXTRA` in `src/ui/strings.ts`. They are under `extra` in `copy.json`, with the same key names, so that object can replace `EXTRA` later. `src/` stays as it is.
+
+Sentence case. Short labels stay short. `{placeholders}` stay put.
+
+### Settings
+
+The garden is paused while Settings is open. (`extra.settings.paused`)
+
+Taps, pops, and chimes. (`extra.settings.soundHelp`)
+
+A quiet music-box tune. (`extra.settings.musicHelp`)
+
+Tips (`extra.settings.tutorial`). Show the tips again from the start. (`extra.settings.tutorialHelp`)
+
+Start over (`extra.settings.newGame`). This erases your saved garden, coins, and orders. (`extra.settings.newGameHelp`)
+
+**New Game** (`extra.settings.newGameButton`). **Keep this garden** (`extra.settings.keep`). **Back to the garden** (`extra.settings.backToGarden`).
+
+### Top bar
+
+Orders (`extra.hud.orders`). Heading: Order {n} of {total} (`extra.hud.orderOf`). For {customer} (`extra.hud.forCustomer`).
+
+Spoken count: {done} of {total} orders packed (`extra.hud.ordersDone`)
+
+Speed (`extra.hud.speed`). The buttons read {n}× (`extra.hud.speedN`). Spoken: Speed {n} times (`extra.a11y.speedN`).
+
+Zoom in (`extra.hud.zoomIn`). Zoom out (`extra.hud.zoomOut`). Fit (`extra.hud.fit`). Fit the garden on screen, or press Home. (`extra.hud.fitTooltip`)
+
+Tips (`extra.hud.tips`). Open How to Play, or press H. (`extra.hud.tipsTooltip`)
+
+Open market, on the order card and the ending card: Everything you deliver now sells for coins, and you can place every building. (`extra.hud.sandboxBody`)
+
+### Screen reader
+
+Arrow keys move the cursor. Press Enter to place or select. R rotates, and Esc cancels. (`extra.a11y.gameHelp`)
+
+Notices (`extra.a11y.notices`). Skip to the garden (`extra.a11y.skipToGarden`). Empty grass (`extra.a11y.emptyTile`).
+
+{what} at column {x}, row {y} (`extra.a11y.cursorTile`)
+
+### Build hint and palette
+
+Refund (`extra.palette.refund`), where a building would show its price.
+
+Faces {facing} (`extra.palette.facing`). R rotates (`extra.palette.rotateHint`).
+
+Click to place. (`extra.palette.clickToPlace`)
+
+Release to lay the path. (`extra.palette.releaseToLay`)
+
+{n} belts, {cost} coins (`extra.palette.beltsCount`)
+
+1 belt, {cost} coins (`extra.palette.beltCount`)
+
+Remove {name} (`extra.palette.removeWhat`). You get {coins} coins back. (`extra.palette.refundLine`)
+
+The {name} stays in the garden. (`extra.palette.staysInYard` and `extra.errors.notRemovable`)
+
+Place {item} (`extra.palette.placeItem`). Needs an empty belt. (`extra.palette.needsBelt`). Click to drop it on this belt. (`extra.palette.dropHere`)
+
+After the Open Plot cost line: The garden grows to 20 by 14 tiles. (`extra.palette.expandLine`)
+
+### Blocked
+
+When the next belt points back at this one: The belt ahead points back at this one, so turn one of them. (`extra.blocked.headOn`)
+
+Blocked: enough of those (`extra.blocked.stockFull`)
+
+The Packing Station is full of {item}. More can come in when an order needs them. (`extra.blocked.stockFullDetail`)
+
+### Status lines
+
+Moves one tile every {seconds} seconds. (`extra.states.movesEvery`)
+
+One {item} every {seconds} seconds. (`extra.states.growsEvery`)
+
+Output faces {facing}. (`extra.states.outputLeaves`)
+
+Takes ingredients from any side, and the output faces {facing}. (`extra.states.takesAnySide`)
+
+Received {count} (`extra.states.received`). {n} ready (`extra.states.readyCount`).
+
+With the orders done, goods sell for coins as they arrive. (`extra.states.packingSandbox`)
+
+Holds up to {cap} of each kind. (`extra.states.packingCap`)
+
+Won't take {item}. This recipe doesn't use it, or that slot is full. (`extra.states.refused`)
+
+### Inspector
+
+{line} in {seconds} seconds (`extra.inspector.recipeSeconds`)
+
+Holding (`extra.inspector.holding`)
+
+Rotate, or press R. (`extra.inspector.rotateTip`)
+
+Remove for a refund, or press Delete. (`extra.inspector.removeTip`)
+
+### Celebration and ending
+
+Open Plot (`extra.celebration.expansionName`)
+
+{name} is in the build menu now. (`extra.celebration.unlockGeneric`)
+
+Stat labels: Orders packed (`extra.ending.ordersFilled`), Items delivered (`extra.ending.itemsDelivered`), Coins earned (`extra.ending.coinsEarned`).
+
+### How to play
+
+How to Play (`extra.tutorial.helpTitle`)
+
+Drag empty grass, or hold the middle mouse button, to pan. Scroll to zoom. Click a bed, belt, or machine to see details. (`extra.tutorial.mouse`)
+
+### Errors
+
+The Packing Station takes deliveries from every side, so there is nothing to turn. (`extra.errors.packingNoFacing`)
+
+That tile is taken now, so nothing changed. (`extra.errors.undoTaken`)
+
+Not enough coins to put that back. (`extra.errors.undoFunds`)
+
+The basket has none of those. (`extra.errors.basketEmpty`)
+
+The far plot is already open. (`extra.errors.expansionDone`)
+
+More garden opens later. (`extra.errors.expansionLocked`)
+
+### Extra control rows
+
+Shown under the controls table. Input, then action.
+
+| Input | Action |
+| --- | --- |
+| Arrows or WASD | Move the cursor |
+| Enter or Space | Place or select at the cursor |
+| Shift+R | Rotate the other way |
+| X | Remove tool |
+| Delete | Remove the selected structure |
+| B | Show or hide the build menu |
+| P | Pause or resume |
+| F | Change speed |
+| = and - | Zoom in or out |
+| Home | Fit the garden |
+| H | Open How to Play |

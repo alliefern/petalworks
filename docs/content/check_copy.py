@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Check docs/content/copy.json against the copy-pass rules.
 
-Compares the key set to main's copy.json, then scans string values for
-punctuation and banned words. Exits 0 on pass.
+Baseline keys must match main's copy.json, in the same order. The extra
+section is the leftover UI strings: the checker requires those keys and
+their placeholders, and scans every string for punctuation and banned words.
+Exits 0 on pass.
 """
 
 from __future__ import annotations
@@ -98,6 +100,133 @@ BRITISH = re.compile(
     re.IGNORECASE,
 )
 
+# Leftover UI strings. Paths are the leaves under extra. Tokens include braces.
+# A dropped key, a new key, or a changed placeholder fails the check.
+EXTRA_LEAF_PATHS = (
+    'extra.settings.paused',
+    'extra.settings.soundHelp',
+    'extra.settings.musicHelp',
+    'extra.settings.tutorial',
+    'extra.settings.tutorialHelp',
+    'extra.settings.newGame',
+    'extra.settings.newGameHelp',
+    'extra.settings.newGameButton',
+    'extra.settings.keep',
+    'extra.settings.backToGarden',
+    'extra.hud.orders',
+    'extra.hud.speed',
+    'extra.hud.speedN',
+    'extra.hud.zoomIn',
+    'extra.hud.zoomOut',
+    'extra.hud.fit',
+    'extra.hud.fitTooltip',
+    'extra.hud.tips',
+    'extra.hud.tipsTooltip',
+    'extra.hud.orderOf',
+    'extra.hud.forCustomer',
+    'extra.hud.sandboxBody',
+    'extra.hud.ordersDone',
+    'extra.a11y.gameHelp',
+    'extra.a11y.speedN',
+    'extra.a11y.notices',
+    'extra.a11y.cursorTile',
+    'extra.a11y.emptyTile',
+    'extra.a11y.skipToGarden',
+    'extra.palette.refund',
+    'extra.palette.facing',
+    'extra.palette.rotateHint',
+    'extra.palette.clickToPlace',
+    'extra.palette.releaseToLay',
+    'extra.palette.beltsCount',
+    'extra.palette.beltCount',
+    'extra.palette.removeWhat',
+    'extra.palette.refundLine',
+    'extra.palette.staysInYard',
+    'extra.palette.placeItem',
+    'extra.palette.needsBelt',
+    'extra.palette.dropHere',
+    'extra.palette.expandLine',
+    'extra.blocked.headOn',
+    'extra.blocked.stockFull',
+    'extra.blocked.stockFullDetail',
+    'extra.states.movesEvery',
+    'extra.states.growsEvery',
+    'extra.states.outputLeaves',
+    'extra.states.takesAnySide',
+    'extra.states.received',
+    'extra.states.readyCount',
+    'extra.states.packingSandbox',
+    'extra.states.packingCap',
+    'extra.states.refused',
+    'extra.inspector.recipeSeconds',
+    'extra.inspector.holding',
+    'extra.inspector.rotateTip',
+    'extra.inspector.removeTip',
+    'extra.celebration.expansionName',
+    'extra.celebration.unlockGeneric',
+    'extra.ending.ordersFilled',
+    'extra.ending.itemsDelivered',
+    'extra.ending.coinsEarned',
+    'extra.tutorial.helpTitle',
+    'extra.tutorial.mouse',
+    'extra.errors.notRemovable',
+    'extra.errors.packingNoFacing',
+    'extra.errors.undoTaken',
+    'extra.errors.undoFunds',
+    'extra.errors.basketEmpty',
+    'extra.errors.expansionDone',
+    'extra.errors.expansionLocked',
+    'extra.controlsExtra[0][0]',
+    'extra.controlsExtra[0][1]',
+    'extra.controlsExtra[1][0]',
+    'extra.controlsExtra[1][1]',
+    'extra.controlsExtra[2][0]',
+    'extra.controlsExtra[2][1]',
+    'extra.controlsExtra[3][0]',
+    'extra.controlsExtra[3][1]',
+    'extra.controlsExtra[4][0]',
+    'extra.controlsExtra[4][1]',
+    'extra.controlsExtra[5][0]',
+    'extra.controlsExtra[5][1]',
+    'extra.controlsExtra[6][0]',
+    'extra.controlsExtra[6][1]',
+    'extra.controlsExtra[7][0]',
+    'extra.controlsExtra[7][1]',
+    'extra.controlsExtra[8][0]',
+    'extra.controlsExtra[8][1]',
+    'extra.controlsExtra[9][0]',
+    'extra.controlsExtra[9][1]',
+    'extra.controlsExtra[10][0]',
+    'extra.controlsExtra[10][1]',
+)
+
+EXTRA_TOKENS: dict[str, set[str]] = {
+    'extra.hud.speedN': {'{n}'},
+    'extra.hud.orderOf': {'{n}', '{total}'},
+    'extra.hud.forCustomer': {'{customer}'},
+    'extra.hud.ordersDone': {'{done}', '{total}'},
+    'extra.a11y.speedN': {'{n}'},
+    'extra.a11y.cursorTile': {'{what}', '{x}', '{y}'},
+    'extra.palette.facing': {'{facing}'},
+    'extra.palette.beltsCount': {'{cost}', '{n}'},
+    'extra.palette.beltCount': {'{cost}'},
+    'extra.palette.removeWhat': {'{name}'},
+    'extra.palette.refundLine': {'{coins}'},
+    'extra.palette.staysInYard': {'{name}'},
+    'extra.palette.placeItem': {'{item}'},
+    'extra.blocked.stockFullDetail': {'{item}'},
+    'extra.states.movesEvery': {'{seconds}'},
+    'extra.states.growsEvery': {'{item}', '{seconds}'},
+    'extra.states.outputLeaves': {'{facing}'},
+    'extra.states.takesAnySide': {'{facing}'},
+    'extra.states.received': {'{count}'},
+    'extra.states.readyCount': {'{n}'},
+    'extra.states.packingCap': {'{cap}'},
+    'extra.states.refused': {'{item}'},
+    'extra.inspector.recipeSeconds': {'{line}', '{seconds}'},
+    'extra.celebration.unlockGeneric': {'{name}'},
+    'extra.errors.notRemovable': {'{name}'},
+}
 
 def key_paths(node, prefix=""):
     if isinstance(node, dict):
@@ -135,19 +264,35 @@ def main() -> int:
     problems = []
     now_keys = list(key_paths(data))
     old_keys = list(key_paths(baseline))
-    if now_keys != old_keys:
+    baseline_kept = now_keys[: len(old_keys)] == old_keys
+    if not baseline_kept:
         missing = [k for k in old_keys if k not in now_keys]
-        extra = [k for k in now_keys if k not in old_keys]
-        problems.append(f"key mismatch missing={missing[:8]} extra={extra[:8]}")
+        problems.append(f"baseline key mismatch missing={missing[:8]}")
+    added = now_keys[len(old_keys) :]
+    bad_added = [
+        k
+        for k in added
+        if k != "extra" and not k.startswith("extra.") and not k.startswith("extra[")
+    ]
+    if bad_added:
+        problems.append(f"new keys outside extra: {bad_added[:8]}")
+    if not added:
+        problems.append("missing extra section")
 
     old_leaves = dict(leaves(baseline))
     new_leaves = dict(leaves(data))
+    missing_extra = [k for k in EXTRA_LEAF_PATHS if k not in new_leaves]
+    if missing_extra:
+        problems.append("extra leaves missing: " + ", ".join(missing_extra[:12]))
     for path, value in new_leaves.items():
+        is_new = path not in old_leaves
         old = old_leaves.get(path)
-        if type(value) is not type(old):
+        if not is_new and type(value) is not type(old):
             problems.append(f"type changed at {path}: {type(old).__name__} -> {type(value).__name__}")
         if not isinstance(value, str):
-            if value != old:
+            if is_new:
+                problems.append(f"new leaf is not a string at {path}")
+            elif value != old:
                 problems.append(f"non-string changed at {path}: {old!r} -> {value!r}")
             continue
         for char, name in BAD_CHARS.items():
@@ -161,10 +306,18 @@ def main() -> int:
         for word in BANNED:
             if re.search(rf"\b{re.escape(word)}\b", low):
                 problems.append(f"banned word {word!r} in {path}: {value}")
-        old_tokens = set(re.findall(r"\{[a-zA-Z]+\}", old if isinstance(old, str) else ""))
         new_tokens = set(re.findall(r"\{[a-zA-Z]+\}", value))
-        if old_tokens != new_tokens:
-            problems.append(f"tokens changed at {path}: {old_tokens} -> {new_tokens}")
+        if is_new:
+            if path not in EXTRA_LEAF_PATHS:
+                problems.append(f"unexpected new leaf {path}")
+            elif new_tokens != EXTRA_TOKENS.get(path, set()):
+                problems.append(
+                    f"extra tokens at {path}: {new_tokens} != {EXTRA_TOKENS.get(path, set())}"
+                )
+        else:
+            old_tokens = set(re.findall(r"\{[a-zA-Z]+\}", old if isinstance(old, str) else ""))
+            if old_tokens != new_tokens:
+                problems.append(f"tokens changed at {path}: {old_tokens} -> {new_tokens}")
 
     md = MD.read_text(encoding="utf-8")
     for char, name in BAD_CHARS.items():
@@ -185,7 +338,7 @@ def main() -> int:
         if value != old_leaves.get(path)
     ]
     print(f"parsed: yes")
-    print(f"keys: {len(now_keys)} (same order: {now_keys == old_keys})")
+    print(f"keys: {len(now_keys)} (baseline order kept: {baseline_kept}, added: {len(added)})")
     print(f"leaves: {len(new_leaves)}")
     print(f"changed leaves: {len(changed)}")
     if problems:
