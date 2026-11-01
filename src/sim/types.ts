@@ -188,10 +188,20 @@ export interface OrderDef {
   hint: string;
 }
 
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface PlotDef {
   id: string;
-  rect: { x: number; y: number; w: number; h: number };
+  /** Union of rectangles in absolute tile coordinates. */
+  rects: Rect[];
   cost: number;
+  /** Shown as an Open Plot purchase; legacy plots are only added on load. */
+  purchasable: boolean;
 }
 
 // ---- Actions -------------------------------------------------------------

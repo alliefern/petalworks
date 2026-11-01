@@ -224,6 +224,7 @@ await page.waitForTimeout(300);
 const coveredTiles = await ev(() => {
   const cam = window.__cam; const T = 64; const w = window.petalworks.sim.world; let n = 0;
   for (let y = 0; y < w.rows; y++) for (let x = 0; x < w.cols; x++) {
+    if (!window.petalworks.sim.isOpen(x, y)) continue;
     const sx = (x * T + T / 2 - cam.worldView.x) * cam.zoom; const sy = (y * T + T / 2 - cam.worldView.y) * cam.zoom;
     const el = document.elementFromPoint(sx, sy);
     if (el && el.closest('.orderpanel, .tutorial, .inspector')) n++;

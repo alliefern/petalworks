@@ -110,6 +110,11 @@ export class Sim {
     return structureAt(this.world, this.index, x, y);
   }
 
+  /** Is the tile inside an open plot (buildable)? */
+  isOpen(x: number, y: number): boolean {
+    return isOpenTile(this.world, x, y);
+  }
+
   isUnlocked(kind: StructureKind): boolean {
     return isSandbox(this.world) || this.world.unlocked.includes(kind);
   }

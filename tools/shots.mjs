@@ -101,6 +101,24 @@ await page.waitForTimeout(200);
 await page.screenshot({ path: 'producer/shots/06-settings.png' });
 
 await page.evaluate(() => window.petalworks.setUi({ settingsOpen: false }));
+// The yard outline: whole yard with the closed field, then after Open Plot.
+await page.keyboard.press('Home');
+await page.waitForTimeout(400);
+await page.screenshot({ path: 'producer/shots/14-yard-outline.png' });
+await page.evaluate(() => { const s = window.petalworks; s.sim.world.coins = 500; s.setUi({}); s.dispatch({ type: 'expand' }); });
+await page.keyboard.press('Home');
+await page.waitForTimeout(500);
+await page.screenshot({ path: 'producer/shots/15-yard-expanded.png' });
+await page.setViewportSize({ width: 1280, height: 800 });
+await page.keyboard.press('Home');
+await page.waitForTimeout(400);
+await page.screenshot({ path: 'producer/shots/16-yard-expanded-1280x800.png' });
+await page.setViewportSize({ width: 1024, height: 640 });
+await page.keyboard.press('Home');
+await page.waitForTimeout(400);
+await page.screenshot({ path: 'producer/shots/17-yard-expanded-1024x640.png' });
+await page.setViewportSize({ width: 1440, height: 900 });
+await page.evaluate(() => { const s = window.petalworks; s.sim.world.unlockedPlotIds = ['potting']; const b = s.sim.world; const { boundsOf } = { boundsOf: null }; void boundsOf; b.cols = 18; b.rows = 14; s.layoutVersion++; s.setUi({}); });
 await page.setViewportSize({ width: 1366, height: 768 });
 await page.evaluate(() => window.petalworks.setUi({ cursor: null }));
 await page.keyboard.press('Home');

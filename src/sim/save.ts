@@ -1,9 +1,10 @@
 import { ORDERS } from './data/orders';
 import { isItemKind } from './data/items';
-import { boundsOf, PLOTS, START_PLOT_IDS } from './data/plots';
+import { boundsOf, LEGACY_FOR, PLOTS, plotById, plotCoversTile, START_PLOT_IDS } from './data/plots';
 import { RECIPES } from './data/recipes';
 import { isStructureKind, STRUCTURES } from './data/structures';
 import { createWorld, makeStructure, Sim } from './game';
+import { isOpenTile } from './grid';
 import type { Counts, Dir, Item, Structure, World } from './types';
 
 /** Bump when the shape changes; add a step to MIGRATIONS. */
@@ -157,6 +158,20 @@ function sanitizeWorld(raw: unknown): World | null {
   const fresh = createWorld();
   const plotIds = Array.isArray(raw.unlockedPlotIds) ? raw.unlockedPlotIds.filter((id): id is string => typeof id === 'string' && PLOTS.some((p) => p.id === id)) : [];
   for (const id of START_PLOT_IDS) if (!plotIds.includes(id)) plotIds.push(id);
+  // Saves from before the yard had its irregular outline may have built on tiles that are
+  // now notches. Opening the matching legacy plot keeps every one of them valid, in place.
+  const rawList: unknown[] = Array.isArray(raw.structures) ? raw.structures : isRecord(raw.structures) ? Object.values(raw.structures) : [];
+  for (const rs of rawList) {
+    if (!isRecord(rs)) continue;
+    const x = Math.floor(num(rs.x, -1));
+    const y = Math.floor(num(rs.y, -1));
+    if (x < 0 || y < 0) continue;
+    if (plotIds.some((id) => plotCoversTile(plotById(id)!, x, y))) continue;
+    for (const open of [...plotIds]) {
+      const legacy = LEGACY_FOR[open];
+      if (legacy && !plotIds.includes(legacy) && plotCoversTile(plotById(legacy)!, x, y)) plotIds.push(legacy);
+    }
+  }
   const bounds = boundsOf(plotIds);
 
   const ordersRaw = isRecord(raw.orders) ? raw.orders : {};
@@ -220,7 +235,7 @@ function sanitizeWorld(raw: unknown): World | null {
     if (!isRecord(rs) || !isStructureKind(rs.kind)) continue;
     const x = Math.floor(num(rs.x, -1));
     const y = Math.floor(num(rs.y, -1));
-    if (x < 0 || y < 0 || x >= world.cols || y >= world.rows) continue;
+    if (x < 0 || y < 0 || x >= world.cols || y >= world.rows || !isOpenTile(world, x, y)) continue;
     const key = `${x},${y}`;
     if (seenTiles.has(key)) continue;
     const facingRaw = Math.floor(num(rs.facing, 1));
@@ -270,7 +285,7 @@ function sanitizeWorld(raw: unknown): World | null {
         for (let dx = -r; dx <= r && !placed; dx++) {
           const x = home.x + dx;
           const y = home.y + dy;
-          if (x < 0 || y < 0 || x >= world.cols || y >= world.rows || seenTiles.has(`${x},${y}`)) continue;
+          if (!isOpenTile(world, x, y) || seenTiles.has(`${x},${y}`)) continue;
           const s = makeStructure(world, 'packing_station', x, y, 0);
           world.structures[s.id] = s;
           placed = true;

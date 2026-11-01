@@ -1,4 +1,4 @@
-import { PLOTS } from './data/plots';
+import { PLOTS, plotById, plotCoversTile } from './data/plots';
 import { STRUCTURES } from './data/structures';
 import type { Dir, Port, Structure, StructureDef, World } from './types';
 
@@ -13,9 +13,8 @@ export const rotateCW = (d: Dir): Dir => ((d + 1) % 4) as Dir;
 export const rotateCCW = (d: Dir): Dir => ((d + 3) % 4) as Dir;
 
 export function plotCovers(id: string, x: number, y: number): boolean {
-  const p = PLOTS.find((q) => q.id === id);
-  if (!p) return false;
-  return x >= p.rect.x && y >= p.rect.y && x < p.rect.x + p.rect.w && y < p.rect.y + p.rect.h;
+  const p = plotById(id);
+  return !!p && plotCoversTile(p, x, y);
 }
 
 /** True when the tile is inside an open plot. */
@@ -24,9 +23,9 @@ export function isOpenTile(world: World, x: number, y: number): boolean {
   return world.unlockedPlotIds.some((id) => plotCovers(id, x, y));
 }
 
-/** True when the tile is inside any plot at all (open or still closed). */
+/** True when the tile is inside a purchasable plot (open or still closed). */
 export function isAnyPlotTile(x: number, y: number): boolean {
-  return PLOTS.some((p) => plotCovers(p.id, x, y));
+  return PLOTS.some((p) => (p.purchasable || p.id === 'potting') && plotCoversTile(p, x, y));
 }
 
 export const tileKey = (x: number, y: number): number => (x + 1000) * 2048 + (y + 1000);

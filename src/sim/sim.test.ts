@@ -9,7 +9,7 @@ import { currentOrder, isSandbox } from './orders';
 import { deserialize, DEFAULT_SETTINGS, SCHEMA_VERSION, serialize } from './save';
 import type { Dir, ItemKind, SimEvent, StructureKind } from './types';
 
-const EXPANSION_COST = PLOTS[1].cost;
+const EXPANSION_COST = PLOTS.find((p) => p.id === 'south-rim')!.cost;
 const orderIdx = (sim: Sim) => (sim.world.orders.activeId ? ORDERS.findIndex((o) => o.id === sim.world.orders.activeId) : ORDERS.length);
 const packingId = (sim: Sim) => Object.values(sim.world.structures).find((x) => x.kind === 'packing_station')!.id;
 
@@ -19,10 +19,12 @@ const W: Dir = 3;
 const N: Dir = 0;
 
 /** A sim with everything unlocked and plenty of coins, for mechanics tests. */
+/** Mechanics tests use the plain 16×12 box (the legacy plot) so corner coordinates stay valid. */
 function rich(): Sim {
   const sim = new Sim(createWorld());
   sim.world.coins = 10_000;
   sim.world.unlocked = Object.keys(STRUCTURES) as StructureKind[];
+  sim.world.unlockedPlotIds.push('legacy-potting');
   return sim;
 }
 
@@ -80,9 +82,9 @@ describe('fresh world', () => {
 
   it('cannot place locked structures or spend what it does not have', () => {
     const sim = new Sim();
-    expect(sim.dispatch({ type: 'place', kind: 'lavender_bed', x: 1, y: 1, facing: E }).error).toBe('locked');
+    expect(sim.dispatch({ type: 'place', kind: 'lavender_bed', x: 3, y: 3, facing: E }).error).toBe('locked');
     sim.world.coins = 5;
-    expect(sim.dispatch({ type: 'place', kind: 'daisy_bed', x: 1, y: 1, facing: E }).error).toBe('unaffordable');
+    expect(sim.dispatch({ type: 'place', kind: 'daisy_bed', x: 3, y: 3, facing: E }).error).toBe('unaffordable');
     expect(Object.values(sim.world.structures).filter((x) => x.kind !== 'packing_station')).toHaveLength(0);
   });
 
@@ -90,7 +92,8 @@ describe('fresh world', () => {
     const sim = rich();
     place(sim, 'daisy_bed', 2, 2);
     expect(sim.dispatch({ type: 'place', kind: 'belt', x: 2, y: 2, facing: E }).error).toBe('occupied');
-    expect(sim.dispatch({ type: 'place', kind: 'belt', x: 16, y: 2, facing: E }).error).toBe('locked_plot');
+    expect(sim.dispatch({ type: 'place', kind: 'belt', x: 18, y: 6, facing: E }).error).toBe('locked_plot');
+    expect(sim.dispatch({ type: 'place', kind: 'belt', x: 16, y: 0, facing: E }).error).toBe('locked_plot'); // north-east nook, opens later
     expect(sim.dispatch({ type: 'place', kind: 'belt', x: 25, y: 2, facing: E }).error).toBe('out_of_bounds');
     expect(sim.dispatch({ type: 'place', kind: 'belt', x: -1, y: 2, facing: E }).error).toBe('out_of_bounds');
   });
@@ -374,7 +377,7 @@ describe('orders and economy', () => {
     sim.world.coins = EXPANSION_COST;
     expect(sim.dispatch({ type: 'expand' }).ok).toBe(true);
     expect(sim.world.cols).toBe(20);
-    expect(sim.world.rows).toBe(14);
+    expect(sim.world.rows).toBe(15);
     expect(sim.world.unlockedPlotIds).toEqual(['potting', 'south-rim']);
     expect(sim.world.coins).toBe(0);
     expect(sim.dispatch({ type: 'place', kind: 'belt', x: 18, y: 13, facing: E }).error).toBe('unaffordable');
@@ -544,7 +547,7 @@ describe('save and load', () => {
     expect(loaded.sim.world.orders.activeId).toBe('order2');
     expect(loaded.sim.world.orders.progress.delivered.daisy_bundle).toBe(1);
     expect(loaded.sim.world.unlockedPlotIds).toEqual(['potting']);
-    expect(loaded.sim.world.cols).toBe(16);
+    expect(loaded.sim.world.cols).toBe(18);
     expect(loaded.sim.world.basket.daisy).toBe(1);
     expect(loaded.settings).toMatchObject({ sound: false, music: true, reducedMotion: true, tutorialDismissed: true, speed: 2 });
     expect(Object.values(loaded.sim.world.structures).some((x) => x.kind === 'packing_station')).toBe(true);

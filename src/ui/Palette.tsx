@@ -1,7 +1,7 @@
 import { paletteKey } from '../assets/manifest';
 import { audio } from '../app/audio';
 import { store } from '../app/store';
-import { PLOTS } from '../sim/data/plots';
+import { EXPANSION_PLOT_ID, plotById } from '../sim/data/plots';
 import { PALETTE_ORDER, STRUCTURES } from '../sim/data/structures';
 import type { ItemKind } from '../sim/types';
 import { Icon } from './Icon';
@@ -12,7 +12,7 @@ export function Palette() {
   const world = store.sim.world;
   const unlocked = PALETTE_ORDER.filter((k) => store.sim.isUnlocked(k));
   const basket = Object.entries(world.basket).filter(([, n]) => (n ?? 0) > 0) as Array<[ItemKind, number]>;
-  const expansion = PLOTS[1];
+  const expansion = plotById(EXPANSION_PLOT_ID)!;
   const canExpand = world.expansionUnlocked && !world.unlockedPlotIds.includes(expansion.id);
   const hover = () => audio.hover();
   const basketCount = basket.reduce((a, [, n]) => a + n, 0);
