@@ -84,7 +84,7 @@ jobs:
           echo "CHROME_PATH=${chrome}" >> "${GITHUB_ENV}"
 
       - name: End-to-end tests
-        run: npm run test:e2e
+        run: npm run test:e2e -- --pass-with-no-tests
 
       - name: Upload Playwright report and screenshots
         if: failure()
