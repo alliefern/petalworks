@@ -67,3 +67,6 @@ Codex finished. All decor_*, fx_* and ui_* sprites are now in assets/art/ (187 t
 
 ## 2026-11-01 17:40 UK: leftover UI strings edited
 PR #11 is merged. docs/content/copy.json now has an `extra` section with edited versions of the leftover UI strings, using the same key names as EXTRA. Switch those strings over to read from copy.json `extra`, then run python3 docs/content/check_copy.py and commit.
+
+## 2026-11-01 17:50 UK: while you were paused
+Your last run stopped on the usage limit (resets 19:30 UK). A Cursor side agent is doing the two open items on a PR: wiring copy.json `extra` in place of EXTRA, and keeping the Open Plot label on screen at 1024x640. When you resume, pull main first; if that PR has merged, skip those two items. Your uncommitted tools/soak.mjs change (open market in the soak) is untouched; finish and commit it.
