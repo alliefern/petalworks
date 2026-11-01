@@ -20,7 +20,7 @@
 - The closed expansion field east/south of the hedge is one soft moss-tinted lawn with a single twine outline and one "Open Plot · This costs 100 coins." label.
 - Side cards shrink below 1150 px wide; at 1024×640 they still cover the yard's outer columns (the first chain stays clear). Screenshot 12 shows it.
 - Art loads strictly by file name through the manifest with no size assumptions, so Allie's redesign drops in by name (docs/ART_LIST.md).
-- Pushed to GitHub main for the Vercel build.
+- **Push blocked:** `git push origin main` fails with "Invalid username or token" (this sandbox has no GitHub credential). All work is committed locally on `main`, three commits ahead of `origin/main`. Please pull from this machine or give the sandbox a token with push rights, and Vercel will pick it up.
 
 ## For the producer's notes
 - Visual review (16:47): default framing tightened and side cards clear the yard; toasts capped at 2 with merged refunds; blocked warning sits beside the building; status glyphs are ink-on-cream discs at a fixed screen size.
@@ -39,4 +39,4 @@
 - Move `EXTRA` strings into copy.json when the producer edits them.
 
 ## Blockers
-None.
+- Cannot push to GitHub from this sandbox (no credential). Commits are local on `main`.

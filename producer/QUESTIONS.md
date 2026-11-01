@@ -11,3 +11,5 @@ Each has the default I am building with. None blocks progress. (1–6 and the nu
 4. **`ground_locked.png` has a painted border on every tile**, which tiles into a grid. **Default: the closed field is plain lawn under a soft moss tint with one twine outline and one "Open Plot" label**, and the locked tile art is not used. If Allie's version is seamless (no edge frame), I'll switch back by deleting a few lines.
 
 5. **Default framing.** The game now opens on the used part of the yard (structures plus a 2-tile margin, at least 10×7 tiles, zoom capped at 1.5×). **Fit / Home** shows the whole yard. On small windows (1024 wide) the side cards still cover the yard's edge columns; the cards shrink below 1150 px and the first chain stays clear. Say if you'd rather the default be the whole yard.
+
+6. **Push rights.** `git push origin main` is rejected here (no GitHub token in the sandbox). Everything is committed locally on `main`. Options: pull from this checkout, or set `GH_TOKEN`/a credential helper for me and I'll push. Until then the Vercel build stays at the producer's last push.

@@ -449,6 +449,10 @@ export class PetalScene extends Phaser.Scene {
       this.selectRing.setVisible(true).setPosition(c.x, c.y);
     } else this.selectRing.setVisible(false);
 
+    // Keep the closed-field label a readable screen size at any zoom.
+    const invZoom = 1 / this.cameras.main.zoom;
+    for (const t of this.lockedText) t.setScale(invZoom);
+
     if (ui.cursor) {
       const c = tileCenter(ui.cursor.x, ui.cursor.y);
       this.cursorRing.setVisible(true).setPosition(c.x, c.y);
