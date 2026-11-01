@@ -147,11 +147,14 @@ export class AudioEngine {
 
   /** Fade music down and stop the factory loops while paused. */
   setPaused(paused: boolean): void {
+    if (paused === this.paused) return;
     this.paused = paused;
     if (this.musicGain && this.ctx && this.music) this.musicGain.gain.setTargetAtTime(paused ? 0.35 : 1, this.ctx.currentTime, 0.25);
     if (paused) {
       this.stopLoop('machine_working');
       this.stopLoop('belt_tick');
+    } else {
+      for (const k of ['machine_working', 'belt_tick'] as CueKey[]) if (this.wantLoop.get(k)) this.setLoop(k, true);
     }
   }
 
