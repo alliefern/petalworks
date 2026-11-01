@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm test
+
+      # check_copy.py compares the working tree to `git show main:docs/content/copy.json`.
+      # Pull request checkouts are detached and do not have a local main ref.
+      - name: Check copy
+        if: hashFiles('docs/content/check_copy.py') != ''
+        run: |
+          if ! git rev-parse --verify --quiet refs/heads/main >/dev/null; then
+            git fetch --depth=1 origin refs/heads/main:refs/heads/main
+          fi
+          python3 docs/content/check_copy.py
+
+  e2e:
+    name: End-to-end tests
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # vite preview serves dist/. This job builds its own copy so it does not
+      # depend on artifact layout. It still waits for the build job above.
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # playwright.config.ts launches CHROME_PATH, or /usr/bin/google-chrome if unset.
+      - name: Use installed Playwright Chromium
+        run: |
+          chrome="$(find "${HOME}/.cache/ms-playwright" -type f -path '*/chrome-linux*/chrome' ! -path '*headless*' -print -quit)"
+          if [ -z "${chrome}" ]; then
+            echo "Playwright Chromium binary not found under ${HOME}/.cache/ms-playwright" >&2
+            exit 1
+          fi
+          echo "CHROME_PATH=${chrome}" >> "${GITHUB_ENV}"
+
+      - name: End-to-end tests
+        run: npm run test:e2e -- --pass-with-no-tests
+
+      - name: Upload Playwright report and screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
