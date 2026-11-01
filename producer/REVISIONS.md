@@ -73,3 +73,10 @@ Your last run stopped on the usage limit (resets 19:30 UK). A Cursor side agent 
 
 ## 2026-11-01 18:10 UK: side PR #12 merged
 PR #12 is merged and on main: the UI now reads the leftover strings from copy.json `extra` (EXTRA is gone) and the Open Plot label stays on screen at 1024x640. Skip both of those items. Tests (39) and build pass on main. When you resume after 19:30, pull main, finish and commit your tools/soak.mjs change, then carry on with the next phase in STATUS.md.
+
+## 2026-11-01 18:45 UK: performance fixes (after current polish)
+docs/research/PERFORMANCE.md (PR #13) is merged. The game downloads 4.45 MB before New Game works (23 s on slow 4G), mostly 152 separate PNGs. Do the fixes in its ordered list. Key points:
+- Generate WebP and/or a texture atlas at BUILD time from assets/art/*.png. Keep the PNGs in assets/art/ as the source of truth with the same file names, because Allie will drop in redesigned art by file name. Make resolveSprite prefer the built format.
+- Let the player start sooner, by loading only what the opening needs before New Game, or by showing progress.
+- Long-cache the hashed files (vercel.json headers: immutable, max-age=31536000 for /assets/*).
+Keep the tests green and note the before and after sizes in STATUS.md.
