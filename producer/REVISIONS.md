@@ -22,3 +22,8 @@ Four docs-only PRs are merged and in main (merged with your local commits, nothi
 
 ## 2026-11-01 16:01 UK: capitalization decided
 Allie decided in-game text uses normal capitalization (not all lowercase). See docs/PRODUCER_NOTES.md. Use normal capitalization for any UI strings you write. The producer will do a final copy pass on docs/content/ before you wire it in.
+
+## 2026-11-01 16:10 UK: balance numbers and accessibility plan merged
+Two more docs-only PRs are in main (nothing of yours touched):
+- `docs/design/BALANCE.md` + `tools/balance/simulate.py` — **use these numbers, kept as data (a balance/defs table), not hardcoded in logic:** 120 starting coins. Costs/refunds: Daisy Bed 20/15, Belt 2/2, Bundling Table 40/30, Lavender Bed 40/30 (unlocked by order 4), Drying Bench 60/45 (order 5), Arrangement Table 80/60 (order 6). 20×14 expansion costs 100, no refund, optional, offered after order 4. Packing Station is free, pre-placed, cannot be sold. Order rewards 50, 70, 100, 80, 110, 140. Belts move one tile every 0.5s (5 ticks at 10 Hz). Grow/craft times stay as the brief says.
+- `docs/design/ACCESSIBILITY.md` + `qa/accessibility-checklist.md` — **follow it for the slice**, especially: (1) status pennants get an ink glyph on a cream disc drawn over the pennant art, because the painted pennant colors fail contrast; (2) one `settings.reducedMotion` flag (honors prefers-reduced-motion by default) that calms bobbing/particles/camera moves; (3) the bare-key keyboard map in the doc, leaving browser shortcuts alone; (4) a visual cue for every sound cue; (5) music and sound mute toggles persisted in the settings object. I'll tick the checklist when reviewing builds.
