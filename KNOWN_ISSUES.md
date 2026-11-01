@@ -16,6 +16,9 @@ Honest list. Nothing here is disguised as finished.
 - `docs/content/copy.json` is wired for every string it covers. About 60 short strings it does not cover yet (zoom/fit buttons, "Order 1 of 6", the open-market line, a few error lines, extra keyboard rows) live in `EXTRA` in `src/ui/strings.ts` with the same key style, listed in `producer/QUESTIONS.md` #7.
 - The copy's "place a Packing Station" opening tip is skipped because the station is pre-placed.
 
+## Layout
+- At 1024 px wide the tip card and order card cover the yard's outer columns (the default framing keeps the first chain clear, and the cards shrink below 1150 px). From 1280 px up the cards sit beside the yard.
+
 ## Platform
 - Desktop mouse and keyboard only. Touch is not implemented.
 - No service worker; the game needs its first load online (nothing is fetched after that).

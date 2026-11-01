@@ -15,6 +15,7 @@ npm run build        # type-check + production build into dist/
 npm run preview      # serve dist/ at http://127.0.0.1:4173
 npm run test:e2e     # Playwright browser smoke test (builds are served by `preview`; run `npm run build` first)
 npm run shots        # headless screenshots into producer/shots/ (needs `npm run preview` running)
+node tools/soak.mjs http://127.0.0.1:4173/ 120   # headless soak: full layout at 3x for N seconds, fails on any runtime error
 npm run art:interim  # regenerate the interim sprite set (Python 3 + Pillow)
 ```
 
