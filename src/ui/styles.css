@@ -279,3 +279,14 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible, a:focus-vis
 .celebration .ctitle { font-weight: 800; font-size: 20px; }
 .celebration .cline { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--honey-deep); }
 .celebration .cline.unlock { color: var(--moss-deep); }
+
+/* Small windows: narrower side cards so they cover less of the yard. */
+@media (max-width: 1150px) {
+  .orderpanel, .tutorial, .inspector { width: 232px; }
+  .orderpanel .note { display: none; }
+  .ptool { width: 84px; }
+}
+@media (max-width: 1050px) {
+  .orderpanel, .tutorial, .inspector { width: 212px; padding: 10px 12px; }
+  .topbar .group .btn span { display: none; }
+}

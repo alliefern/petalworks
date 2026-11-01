@@ -17,6 +17,9 @@ export class CameraController {
   padBottomCollapsed = 56;
   /** Width of the tip/inspector column (left) and order card (right). Reserved when the window is wide enough. */
   sidePanel = 276;
+  /** Last framing request, re-run on resize. */
+  lastMode: 'yard' | 'used' = 'used';
+  lastUsed: { x: number; y: number; w: number; h: number } | null = null;
 
   constructor(private scene: Phaser.Scene) {
     this.cam = scene.cameras.main;
@@ -33,10 +36,31 @@ export class CameraController {
    * Returns whether the palette should collapse.
    */
   fit(paletteOpen: boolean): { collapsePalette: boolean } {
+    this.lastMode = 'yard';
+    return this.fitRect(0, 0, this.worldW, this.worldH, paletteOpen, false);
+  }
+
+  /**
+   * Default framing: the part of the yard that is in use (structures plus a margin),
+   * so a first chain fills the screen instead of floating in empty lawn. Zoom is capped
+   * so tiles never exceed 96 px; the player can still Fit the whole yard.
+   */
+  frameUsed(used: { x: number; y: number; w: number; h: number }, paletteOpen: boolean): { collapsePalette: boolean } {
+    this.lastMode = 'used';
+    this.lastUsed = used;
+    return this.fitRect(used.x * TILE, used.y * TILE, used.w * TILE, used.h * TILE, paletteOpen, true);
+  }
+
+  reframe(paletteOpen: boolean): { collapsePalette: boolean } {
+    if (this.lastMode === 'used' && this.lastUsed) return this.frameUsed(this.lastUsed, paletteOpen);
+    return this.fit(paletteOpen);
+  }
+
+  private fitRect(rx: number, ry: number, rw: number, rh: number, paletteOpen: boolean, capZoom: boolean): { collapsePalette: boolean } {
     const vw = this.scene.scale.width;
     const vh = this.scene.scale.height;
-    const w = this.worldW + TILE * 0.2;
-    const h = this.worldH + TILE * 0.2;
+    const w = rw + TILE * 0.2;
+    const h = rh + TILE * 0.2;
     // Keep the garden out from under the side cards when there is room for 48 px tiles that way.
     const gutters = vw - 2 * this.sidePanel >= w * (MIN_DEFAULT_TILE / TILE) ? this.sidePanel : 0;
     const zoomFor = (padBottom: number) => Math.min((vw - 2 * gutters) / w, (vh - this.padTop - padBottom) / h);
@@ -48,9 +72,11 @@ export class CameraController {
       padBottom = this.padBottomCollapsed;
       zoom = zoomFor(padBottom);
     }
-    zoom = Phaser.Math.Clamp(zoom, FLOOR_TILE / TILE, this.maxZoom);
+    zoom = Phaser.Math.Clamp(zoom, FLOOR_TILE / TILE, capZoom ? 1.5 : this.maxZoom);
     this.cam.setZoom(zoom);
-    this.centerOnGarden(padBottom);
+    const offsetY = (this.padTop - padBottom) / 2 / zoom;
+    this.cam.centerOn(rx + rw / 2, ry + rh / 2 + offsetY);
+    this.clamp();
     return { collapsePalette: collapse };
   }
 

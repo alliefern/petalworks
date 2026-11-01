@@ -12,6 +12,7 @@ import { COLORS, DEPTH, TILE } from './constants';
 import { DISC_SIZE, makeOverlayTextures } from './overlays';
 import { beltProgressT, itemPositionOnBelt, tileCenter } from './paths';
 import { SpriteRegistry } from './sprites';
+import { COPY, fmt } from '../ui/strings';
 
 interface StructureView {
   id: number;
@@ -36,6 +37,7 @@ export class PetalScene extends Phaser.Scene {
   private camCtl!: CameraController;
   private ground: Phaser.GameObjects.Image[] = [];
   private lockedGfx: Phaser.GameObjects.Graphics[] = [];
+  private lockedText: Phaser.GameObjects.Text[] = [];
   private groundKey = '';
   private views = new Map<number, StructureView>();
   private items = new Map<number, ItemView>();
@@ -78,7 +80,7 @@ export class PetalScene extends Phaser.Scene {
     makeOverlayTextures(this);
     this.camCtl = new CameraController(this);
     this.camCtl.setWorldSize(this.store.sim.world.cols, this.store.sim.world.rows);
-    this.recenter();
+    this.frameUsedArea();
 
     const mk = (key: string, depth: number) => this.add.image(0, 0, key).setDepth(depth).setVisible(false).setDisplaySize(TILE, TILE);
     this.ghostRing = mk('ring.valid', DEPTH.ghost);
@@ -111,7 +113,7 @@ export class PetalScene extends Phaser.Scene {
       .setDepth(DEPTH.fx);
 
     this.setupInput();
-    this.scale.on('resize', () => this.recenter());
+    this.scale.on('resize', () => this.applyFit(this.camCtl.reframe(this.store.ui.paletteOpen)));
     (window as unknown as { __cam?: unknown }).__cam = this.cameras.main;
     this.ready = true;
   }
@@ -136,6 +138,8 @@ export class PetalScene extends Phaser.Scene {
     this.ground = [];
     for (const g of this.lockedGfx) g.destroy();
     this.lockedGfx = [];
+    for (const t of this.lockedText) t.destroy();
+    this.lockedText = [];
     const W = world.cols;
     const H = world.rows;
     const seeded = (x: number, y: number) => {
@@ -170,14 +174,39 @@ export class PetalScene extends Phaser.Scene {
             put(`ground.grass.${r < 0.8 ? 0 : 1}`, x, y);
           }
         }
+        // The closed strip is the L outside the open plot (which sits at the origin).
         const g = this.add.graphics().setDepth(DEPTH.ground + 0.6);
+        const R = p.rect.x + p.rect.w;
+        const B = p.rect.y + p.rect.h;
+        const pts = [
+          { x: (world.cols + 1) * TILE, y: -TILE },
+          { x: R * TILE, y: -TILE },
+          { x: R * TILE, y: B * TILE },
+          { x: -TILE, y: B * TILE },
+          { x: -TILE, y: (world.rows + 1) * TILE },
+          { x: (world.cols + 1) * TILE, y: (world.rows + 1) * TILE },
+        ];
         g.fillStyle(COLORS.moss, 0.28);
-        // Tint only the closed strip (the open plot is a sub-rectangle at the origin).
-        g.fillRect(world.cols * TILE, p.rect.y * TILE, (p.rect.x + p.rect.w - world.cols) * TILE, p.rect.h * TILE);
-        g.fillRect(p.rect.x * TILE, world.rows * TILE, world.cols * TILE, (p.rect.y + p.rect.h - world.rows) * TILE);
+        g.fillPoints(pts, true);
         g.lineStyle(3, 0xc9a978, 0.9);
-        g.strokeRect(p.rect.x * TILE + 4, p.rect.y * TILE + 4, p.rect.w * TILE - 8, p.rect.h * TILE - 8);
+        g.strokePoints(pts, true);
         this.lockedGfx.push(g);
+        // One label for the whole closed field.
+        const lx = ((world.cols + 1 + R) / 2) * TILE;
+        const ly = (world.rows / 2) * TILE;
+        const label = this.add
+          .text(lx, ly, `${COPY.expansion.button}\n${fmt(COPY.expansion.confirmCost, { cost: p.cost })}`, {
+            fontFamily: 'Nunito, "Segoe UI", sans-serif',
+            fontSize: '18px',
+            fontStyle: '800',
+            color: '#39463b',
+            align: 'center',
+            backgroundColor: 'rgba(246,235,213,0.9)',
+            padding: { x: 12, y: 8 },
+          })
+          .setOrigin(0.5)
+          .setDepth(DEPTH.ground + 0.7);
+        this.lockedText.push(label);
       }
     }
     // Hedge ring (sits one tile outside the open area). The hedge art has transparent
@@ -732,9 +761,57 @@ export class PetalScene extends Phaser.Scene {
   }
 
   // ---- public controls used by the HUD -------------------------------------------------
-  recenter(): void {
-    const r = this.camCtl.fit(this.store.ui.paletteOpen);
+  private applyFit(r: { collapsePalette: boolean }): void {
     if (r.collapsePalette && this.store.ui.paletteOpen) this.store.setUi({ paletteOpen: false });
+  }
+
+  /** Fit the whole yard (Fit button / Home). */
+  recenter(): void {
+    this.applyFit(this.camCtl.fit(this.store.ui.paletteOpen));
+  }
+
+  /**
+   * Default framing: the structures' bounding box plus a 2-tile margin, never smaller than
+   * 10×7 tiles, pulled toward the Packing Station so the first chain fills the screen.
+   */
+  frameUsedArea(): void {
+    const w = this.store.sim.world;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const s of Object.values(w.structures)) {
+      minX = Math.min(minX, s.x);
+      minY = Math.min(minY, s.y);
+      maxX = Math.max(maxX, s.x);
+      maxY = Math.max(maxY, s.y);
+    }
+    if (!Number.isFinite(minX)) {
+      minX = maxX = Math.floor(w.cols / 2);
+      minY = maxY = Math.floor(w.rows / 2);
+    }
+    const margin = 2;
+    let x0 = minX - margin;
+    let y0 = minY - margin;
+    let x1 = maxX + margin + 1;
+    let y1 = maxY + margin + 1;
+    const minW = 10;
+    const minH = 7;
+    if (x1 - x0 < minW) {
+      const cx = (x0 + x1) / 2;
+      x0 = cx - minW / 2;
+      x1 = cx + minW / 2;
+    }
+    if (y1 - y0 < minH) {
+      const cy = (y0 + y1) / 2;
+      y0 = cy - minH / 2;
+      y1 = cy + minH / 2;
+    }
+    x0 = Math.max(-1, x0);
+    y0 = Math.max(-1, y0);
+    x1 = Math.min(w.cols + 1, x1);
+    y1 = Math.min(w.rows + 1, y1);
+    this.applyFit(this.camCtl.frameUsed({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, this.store.ui.paletteOpen));
   }
 
   zoomBy(f: number): void {

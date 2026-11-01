@@ -110,6 +110,10 @@ await page.setViewportSize({ width: 1280, height: 800 });
 await page.keyboard.press('Home');
 await page.waitForTimeout(400);
 await page.screenshot({ path: 'producer/shots/08-laptop-1280x800.png' });
+await page.setViewportSize({ width: 1024, height: 640 });
+await page.waitForTimeout(400);
+await page.screenshot({ path: 'producer/shots/12-small-1024x640.png' });
+await page.setViewportSize({ width: 1440, height: 900 });
 
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no runtime errors');
 await browser.close();

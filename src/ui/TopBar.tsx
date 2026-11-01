@@ -53,7 +53,7 @@ export function TopBar({ onRecenter, onZoom }: { onRecenter: () => void; onZoom:
             aria-pressed={ui.speed === s && !ui.paused}
             data-testid={`speed-${s}`}
           >
-            {s === 1 ? '1×' : s === 2 ? COPY.hud.fast : '3×'}
+            {fmt(EXTRA.hud.speedN, { n: s })}
           </button>
         ))}
       </div>

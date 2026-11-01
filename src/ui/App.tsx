@@ -41,6 +41,12 @@ export function App() {
     };
   }, []);
 
+  // Frame the used area whenever a game starts (new or continued).
+  const screen = ui.screen;
+  useEffect(() => {
+    if (screen === 'game') requestAnimationFrame(() => sceneRef.current?.frameUsedArea());
+  }, [screen]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (store.ui.screen !== 'game') return;

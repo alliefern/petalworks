@@ -14,6 +14,14 @@
 - Autosave, Continue / New Game with confirmation, corrupted-save backup, schema v2 with a v1 migration.
 - Default zoom keeps tiles at least 48 px; at 1366×768 the garden sits between the tip card and the order card instead of under them; the fit re-runs on window resize (Steam-plan guardrail).
 
+## Round of Nov 1, 17:15 (answers + review)
+- Speed buttons now read 1×, 2×, 3× (tooltips use the copy's normal/fast lines).
+- Default framing is the used part of the yard (structures + margin, at least 10×7 tiles, zoom capped) so a first chain fills the screen; Fit / Home shows the whole yard; the framing re-runs on resize.
+- The closed expansion field east/south of the hedge is one soft moss-tinted lawn with a single twine outline and one "Open Plot · This costs 100 coins." label.
+- Side cards shrink below 1150 px wide; at 1024×640 they still cover the yard's outer columns (the first chain stays clear). Screenshot 12 shows it.
+- Art loads strictly by file name through the manifest with no size assumptions, so Allie's redesign drops in by name (docs/ART_LIST.md).
+- Pushed to GitHub main for the Vercel build.
+
 ## For the producer's notes
 - Visual review (16:47): default framing tightened and side cards clear the yard; toasts capped at 2 with merged refunds; blocked warning sits beside the building; status glyphs are ink-on-cream discs at a fixed screen size.
 - Steam guardrails (§3): all kept true; `src/app/shell.ts` holds the no-op hooks. No Electron/Steam code added.
