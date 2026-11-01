@@ -152,3 +152,12 @@ Plot review from shot 15:
 - Check the Open Plot label isn't clipped (item 3 from 21:30).
 Then carry on with the playtest items in order: belts, machine overlap on big screens, placement preview size, sound toggle and volume sliders, responsive layout 1024 to 4K.
 To avoid stalls: commit after each finished step, and keep screenshot reviews to one or two images at a time.
+
+## 22:25 UK — run8 stalled too; starting a fresh session
+Run8 went silent at 22:09 (fourth stall in a row on the long resumed session, which is carrying a huge history of screenshots). I committed its work as checkpoint 87fff3d (49 tests, tsc pass) and pushed it. From now on each run starts a fresh Claude session; read STATUS.md, PRODUCER_NOTES.md and this file to pick up context.
+Plot review from shot 14 (checkpoint 87fff3d):
+- The shape is lumpier now with real bays and bulges. Good. The Open Plot label fits now.
+- Still wrong: stray blocky green ground patches outside the hedge, in the bottom-right, bottom and top-right (square chunks of grass poking past the outer, closed-area edge). The closed area beyond the hedge should be drawn with the same smooth, faded edge, with no square tile chunks showing.
+- The hedge sprites read as boxy segments in places. Fine for now, since Allie is redrawing the art, but keep the line continuous.
+Fix the stray patches first and commit. Then do the playtest items in order: belts (1), machine overlap on big screens (4), placement preview size (2), sound toggle and volume sliders (3), responsive layout 1024 to 4K (5). Commit after each one.
+To avoid stalls: view at most one screenshot per check, and prefer checking pixel data or DOM/state with scripts over reading images.
