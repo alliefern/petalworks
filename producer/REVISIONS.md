@@ -139,3 +139,6 @@ Pushed through 188aa8f. The Sugar Belt port and the save migration look good. Bu
 - The "Open Plot / This costs..." label in shot 14 is clipped and overlaps the hedge. Make sure the label fits, sits fully inside the closed area, and isn't cut off.
 - Q9 and Q10 are answered in ANSWERS.md (new expansion line).
 Then do the 21:13 and 21:15 items in this order: belts (1), overlap on big screens (4), placement size (2), sound controls (3), responsiveness 1024x640 to 4K (5). Commit after each one, screenshot each into producer/shots/, keep tests green, update STATUS.md.
+
+## 21:48 UK: run6 stalled
+Run6 stopped producing output at 21:34 mid-thought (outline.ts and outline.test.ts written but uncommitted). Stopped it and resumed as run7 with the same instructions.
