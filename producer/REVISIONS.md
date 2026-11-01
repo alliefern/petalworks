@@ -89,3 +89,10 @@ Pulled your work, pushed through 48df348; 39 tests and the build pass here, and 
 1. The optional performance follow-ups: skip unchanged belt views per frame, cheaper HUD subscription, subset the Nunito fonts to the glyphs the game uses, and a lighter music file (keep the source file, encode a smaller one at build time or commit a compressed copy). Leave the slimmer Phaser build for now unless it's quick and safe.
 2. Then a full playthrough check of your own against qa/playthrough-checklist.md at 1280x800 and 1024x640, fix anything that fails, and refresh the screenshots.
 Keep tests green, update STATUS.md with new before/after numbers, and commit as you go.
+
+## 2026-11-01 20:35 UK: use the Sugar Belt music (Allie's call)
+Allie wants Petalworks to use the music from her other game, Sugar Belt, because it fits better. It's her own code, so reuse is fine.
+- Source: /workspace/marshmallow-factory/game/src/music.ts (generative Web Audio soundtrack, no sample files). Check audio.ts next to it for anything music.ts depends on, and scripts/music-check.mjs for how it renders and checks levels. /workspace/marshmallow-factory/music-preview.mp3 is a recording of how it should sound.
+- Port it into Petalworks as the background music, replacing assets/audio/music.mp3/.ogg playback. Keep the existing music volume and mute settings working, start it on the first user gesture, and keep the levels from clipping.
+- Remove the music.mp3/.ogg download from the load if nothing else uses it.
+- Keep the tests green and note it in STATUS.md.
