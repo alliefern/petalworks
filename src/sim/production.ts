@@ -1,12 +1,27 @@
-import { OUTPUT_BUFFER_CAP } from './data/balance';
+import { BLOCKED_NOTICE_TICKS, OUTPUT_BUFFER_CAP } from './data/balance';
 import { RECIPES } from './data/recipes';
 import { STRUCTURES } from './data/structures';
 import type { TileIndex } from './grid';
 import { tryPushOut } from './transport';
-import type { Item, ItemKind, SimEvent, Structure, World } from './types';
+import type { BlockReason, Item, ItemKind, SimEvent, Structure, World } from './types';
 
 export function newItem(world: World, kind: ItemKind): Item {
   return { id: world.nextItemId++, kind };
+}
+
+function noteBlocked(s: Structure, state: { blockedTicks: number; block: BlockReason }, reason: BlockReason, events: SimEvent[]): void {
+  if (reason === 'none') {
+    state.blockedTicks = 0;
+    state.block = 'none';
+    return;
+  }
+  const changed = state.block !== reason;
+  state.block = reason;
+  state.blockedTicks += 1;
+  // Edge-trigger once a block has persisted (so a momentary queue does not chime), and again if the reason changes.
+  if (state.blockedTicks === BLOCKED_NOTICE_TICKS || (changed && state.blockedTicks > BLOCKED_NOTICE_TICKS)) {
+    events.push({ type: 'blocked', structureId: s.id, reason });
+  }
 }
 
 export function tickProducers(world: World, index: TileIndex, events: SimEvent[]): void {
@@ -23,20 +38,16 @@ export function tickProducers(world: World, index: TileIndex, events: SimEvent[]
     }
     if (p.output) {
       const reason = tryPushOut(world, index, s, p.output, events);
-      if (reason === 'none') {
-        p.output = null;
-        p.blocked = false;
-      } else {
-        p.blocked = true;
-      }
+      if (reason === 'none') p.output = null;
+      noteBlocked(s, p, reason, events);
     } else {
-      p.blocked = false;
+      noteBlocked(s, p, 'none', events);
     }
   }
 }
 
 export function hasInputsFor(s: Structure): boolean {
-  const recipe = RECIPES[STRUCTURES[s.kind].recipe!];
+  const recipe = RECIPES[s.processor!.recipeId];
   for (const [kind, need] of Object.entries(recipe.inputs)) {
     const have = s.processor!.inputs.filter((i) => i.kind === kind).length;
     if (have < (need ?? 0)) return false;
@@ -46,12 +57,12 @@ export function hasInputsFor(s: Structure): boolean {
 
 export function tickProcessors(world: World, index: TileIndex, events: SimEvent[]): void {
   for (const s of sortedByRole(world, 'processor')) {
-    const recipe = RECIPES[STRUCTURES[s.kind].recipe!];
     const m = s.processor!;
+    const recipe = RECIPES[m.recipeId];
 
     if (m.workTicks !== null) {
       m.workTicks += 1;
-      if (m.workTicks >= recipe.ticks) {
+      if (m.workTicks >= recipe.durationTicks) {
         m.workTicks = null;
         const item = newItem(world, recipe.output);
         m.outputs.push(item);
@@ -76,14 +87,10 @@ export function tickProcessors(world: World, index: TileIndex, events: SimEvent[
 
     if (m.outputs.length > 0) {
       const reason = tryPushOut(world, index, s, m.outputs[0], events);
-      if (reason === 'none') {
-        m.outputs.shift();
-        m.blocked = false;
-      } else {
-        m.blocked = true;
-      }
+      if (reason === 'none') m.outputs.shift();
+      noteBlocked(s, m, reason, events);
     } else {
-      m.blocked = false;
+      noteBlocked(s, m, 'none', events);
     }
   }
 }

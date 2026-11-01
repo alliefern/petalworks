@@ -1,29 +1,13 @@
-import {
-  BASE_GRID,
-  EXPANDED_GRID,
-  EXPANSION_COST,
-  REFUND_RATE,
-  START_COINS,
-  UNDO_STACK_LIMIT,
-} from './data/balance';
+import { PACKING_START, START_COINS, UNDO_STACK_LIMIT } from './data/balance';
 import { ITEMS } from './data/items';
+import { ORDERS } from './data/orders';
+import { boundsOf, EXPANSION_PLOT_ID, plotById, START_PLOT_IDS } from './data/plots';
 import { STRUCTURES } from './data/structures';
-import { dirBetween, inBounds, opposite, structureAt, TileIndex } from './grid';
-import { allocateStock, isSandbox, startCurrentOrder } from './orders';
+import { dirBetween, isAnyPlotTile, isOpenTile, opposite, structureAt, TileIndex } from './grid';
+import { allocateStock, isSandbox, startOrder } from './orders';
 import { newItem, tickProcessors, tickProducers } from './production';
 import { tickBelts } from './transport';
-import type {
-  Action,
-  ActionResult,
-  Counts,
-  Dir,
-  Item,
-  ItemKind,
-  SimEvent,
-  Structure,
-  StructureKind,
-  World,
-} from './types';
+import type { Action, ActionResult, Counts, Dir, Item, ItemKind, SimEvent, Structure, StructureKind, World } from './types';
 
 export type UndoEntry =
   | { type: 'place'; id: number; cost: number }
@@ -32,25 +16,27 @@ export type UndoEntry =
   | { type: 'rotate'; id: number; prev: Dir };
 
 export function createWorld(): World {
+  const { cols, rows } = boundsOf(START_PLOT_IDS);
   const world: World = {
     tick: 0,
-    width: BASE_GRID.width,
-    height: BASE_GRID.height,
-    expanded: false,
+    cols,
+    rows,
+    unlockedPlotIds: [...START_PLOT_IDS],
     structures: {},
     nextStructureId: 1,
     nextItemId: 1,
     coins: START_COINS,
     stock: {},
     basket: {},
-    orderIndex: 0,
-    orderProgress: {},
-    completedOrders: [],
+    orders: { activeId: null, offeredIds: [], completedIds: [], progress: { orderId: null, delivered: {} } },
     unlocked: [],
     expansionUnlocked: false,
     stats: { delivered: 0, crafted: 0, coinsEarned: 0 },
   };
-  startCurrentOrder(world, []);
+  // The Packing Station is part of the yard: free, pre-placed, and it stays.
+  const packing = makeStructure(world, 'packing_station', PACKING_START.x, PACKING_START.y, 0);
+  world.structures[packing.id] = packing;
+  startOrder(world, ORDERS[0].id, []);
   return world;
 }
 
@@ -62,10 +48,19 @@ export function makeStructure(world: World, kind: StructureKind, x: number, y: n
       s.belt = { item: null, progress: 0, from: opposite(facing), block: 'none', stuckTicks: 0 };
       break;
     case 'producer':
-      s.producer = { growTicks: 0, output: null, blocked: false };
+      s.producer = { growTicks: 0, output: null, blockedTicks: 0, block: 'none' };
       break;
     case 'processor':
-      s.processor = { inputs: [], outputs: [], workTicks: null, blocked: false, lastRefusedTick: -1, lastRefusedKind: null };
+      s.processor = {
+        recipeId: def.recipeIds![0],
+        inputs: [],
+        outputs: [],
+        workTicks: null,
+        blockedTicks: 0,
+        block: 'none',
+        lastRefusedTick: -1,
+        lastRefusedKind: null,
+      };
       break;
     case 'packing':
       s.packing = { lastReceivedTick: -1, received: 0 };
@@ -94,6 +89,12 @@ export function totalCount(c: Counts): number {
 /**
  * The simulation. Owns a World plus a spatial index and an undo stack.
  * step() advances exactly one fixed tick. dispatch() applies a player action.
+ *
+ * Tick order is fixed: transport (belts advance and transfer), then production
+ * (beds grow, machines craft, and both push finished items out), then orders
+ * (deliveries allocate to the active order). A craft that finishes on tick T leaves
+ * on tick T if its output tile is free, and a belt tile freed by transport can be
+ * refilled by a bed in the same tick, so a packed line never shows a false "blocked".
  */
 export class Sim {
   world: World;
@@ -120,7 +121,6 @@ export class Sim {
     tickBelts(w, this.index, events);
     tickProducers(w, this.index, events);
     tickProcessors(w, this.index, events);
-    // Record refusals on processors for inspector feedback.
     for (const e of events) {
       if (e.type === 'refused') {
         const s = w.structures[e.structureId];
@@ -158,10 +158,14 @@ export class Sim {
     const w = this.world;
     const def = STRUCTURES[kind];
     if (!def) return { ok: false, error: 'unknown_structure', message: 'Unknown structure.' };
-    if (!this.isUnlocked(kind)) return { ok: false, error: 'locked', message: `${def.name} is not unlocked yet.` };
-    if (!inBounds(w, x, y)) return { ok: false, error: 'out_of_bounds', message: 'That is outside the garden.' };
-    if (this.at(x, y)) return { ok: false, error: 'occupied', message: 'That tile is already taken.' };
-    if (w.coins < def.cost) return { ok: false, error: 'unaffordable', message: `Not enough coins. ${def.name} costs ${def.cost}.` };
+    if (!def.buildable) return { ok: false, error: 'not_buildable', message: `${def.name} is already in the yard.` };
+    if (!this.isUnlocked(kind)) return { ok: false, error: 'locked', message: 'That unlocks later.' };
+    if (!isOpenTile(w, x, y)) {
+      if (isAnyPlotTile(x, y)) return { ok: false, error: 'locked_plot', message: 'That part of the garden is still closed.' };
+      return { ok: false, error: 'out_of_bounds', message: 'That spot is outside the garden.' };
+    }
+    if (this.at(x, y)) return { ok: false, error: 'occupied', message: 'That tile already has something on it.' };
+    if (w.coins < def.cost) return { ok: false, error: 'unaffordable', message: `Not enough coins. This costs ${def.cost}. You have ${w.coins}.` };
     return { ok: true };
   }
 
@@ -183,13 +187,14 @@ export class Sim {
    * direction. Existing belts on the path are re-oriented for free; other structures are skipped.
    */
   private placeBeltPath(tiles: Array<{ x: number; y: number; facing?: Dir }>, events: SimEvent[]): ActionResult {
-    if (!this.isUnlocked('belt')) return { ok: false, error: 'locked', message: 'Belts are not unlocked yet.' };
+    if (!this.isUnlocked('belt')) return { ok: false, error: 'locked', message: 'That unlocks later.' };
     if (tiles.length === 0) return { ok: false, error: 'invalid' };
     const cost = STRUCTURES.belt.cost;
     const placed: number[] = [];
     const rotated: Array<{ id: number; prev: Dir }> = [];
     let spent = 0;
     let unaffordable = false;
+    let skipped = false;
     let lastDir: Dir | null = null;
     for (let i = 0; i < tiles.length; i++) {
       const t = tiles[i];
@@ -197,14 +202,14 @@ export class Sim {
       let facing: Dir | null = next ? dirBetween(t.x, t.y, next.x, next.y) : lastDir;
       if (facing === null) facing = t.facing ?? 1;
       lastDir = facing;
-      if (!inBounds(this.world, t.x, t.y)) continue;
+      if (!isOpenTile(this.world, t.x, t.y)) continue;
       const existing = this.at(t.x, t.y);
       if (existing) {
         if (existing.kind === 'belt' && existing.facing !== facing && tiles.length > 1) {
           rotated.push({ id: existing.id, prev: existing.facing });
           this.setBeltFacing(existing, facing);
           events.push({ type: 'rotated', structureId: existing.id });
-        }
+        } else if (existing.kind !== 'belt') skipped = true;
         continue;
       }
       if (this.world.coins < cost) {
@@ -219,19 +224,17 @@ export class Sim {
       placed.push(s.id);
       events.push({ type: 'placed', structureId: s.id, kind: 'belt' });
     }
-    if (placed.length || rotated.length) {
-      this.pushUndo({ type: 'belt_path', placed, rotated, cost: spent });
-    }
+    if (placed.length || rotated.length) this.pushUndo({ type: 'belt_path', placed, rotated, cost: spent });
     if (unaffordable) {
       return {
         ok: placed.length > 0,
         error: 'unaffordable',
-        message: placed.length ? 'Ran out of coins part way along the belt.' : 'Not enough coins for a belt.',
+        message: placed.length ? 'Not enough coins to finish this path.' : `Not enough coins. This costs ${cost}. You have ${this.world.coins}.`,
         ids: placed,
       };
     }
-    if (!placed.length && !rotated.length) return { ok: false, error: 'occupied', message: 'Those tiles are already taken.' };
-    return { ok: true, ids: [...placed, ...rotated.map((r) => r.id)] };
+    if (!placed.length && !rotated.length) return { ok: false, error: 'occupied', message: 'That tile already has something on it.' };
+    return { ok: true, ids: [...placed, ...rotated.map((r) => r.id)], message: skipped ? 'Full tiles were skipped.' : undefined };
   }
 
   private setBeltFacing(s: Structure, facing: Dir): void {
@@ -247,15 +250,21 @@ export class Sim {
   private rotate(id: number, facing: Dir | undefined, events: SimEvent[]): ActionResult {
     const s = this.world.structures[id];
     if (!s) return { ok: false, error: 'unknown_structure' };
-    if (!STRUCTURES[s.kind].hasFacing) return { ok: false, error: 'invalid', message: 'The Packing Station accepts from every side; it has no direction.' };
+    if (!STRUCTURES[s.kind].hasFacing) return { ok: false, error: 'invalid', message: 'The Packing Station takes deliveries from every side. It has no direction.' };
     const target: Dir = facing ?? (((s.facing + 1) % 4) as Dir);
     if (target === s.facing) return { ok: true, ids: [id] };
     const prev = s.facing;
     if (s.kind === 'belt') this.setBeltFacing(s, target);
     else {
       s.facing = target;
-      if (s.producer) s.producer.blocked = false;
-      if (s.processor) s.processor.blocked = false;
+      if (s.producer) {
+        s.producer.blockedTicks = 0;
+        s.producer.block = 'none';
+      }
+      if (s.processor) {
+        s.processor.blockedTicks = 0;
+        s.processor.block = 'none';
+      }
     }
     this.pushUndo({ type: 'rotate', id, prev });
     events.push({ type: 'rotated', structureId: id });
@@ -264,8 +273,10 @@ export class Sim {
 
   private remove(id: number, events: SimEvent[]): ActionResult {
     const s = this.world.structures[id];
-    if (!s) return { ok: false, error: 'unknown_structure' };
-    const refund = Math.round(STRUCTURES[s.kind].cost * REFUND_RATE);
+    if (!s) return { ok: false, error: 'unknown_structure', message: 'Nothing there to remove.' };
+    const def = STRUCTURES[s.kind];
+    if (!def.removable) return { ok: false, error: 'not_removable', message: `The ${def.name} stays in the yard.` };
+    const refund = def.refund;
     const recovered: Counts = {};
     for (const item of itemsIn(s)) {
       addCounts(this.world.basket, item.kind);
@@ -275,18 +286,18 @@ export class Sim {
     this.index.clear(s.x, s.y);
     this.world.coins += refund;
     this.pushUndo({ type: 'remove', kind: s.kind, x: s.x, y: s.y, facing: s.facing, refund });
-    events.push({ type: 'removed', structureId: id, kind: s.kind, recovered });
+    events.push({ type: 'removed', structureId: id, kind: s.kind, recovered, refund });
     const n = totalCount(recovered);
-    return {
-      ok: true,
-      ids: [id],
-      message: n > 0 ? `${n} item${n === 1 ? '' : 's'} moved to your basket.` : undefined,
-    };
+    const parts: string[] = [];
+    if (n === 1) parts.push(`${ITEMS[Object.keys(recovered)[0] as ItemKind].name} went to the basket.`);
+    else if (n > 1) parts.push('Items went to the basket.');
+    if (refund > 0) parts.push(`${refund} coins returned.`);
+    return { ok: true, ids: [id], refund, message: parts.length ? parts.join(' ') : undefined };
   }
 
   private undo(events: SimEvent[]): ActionResult {
     const entry = this.undoStack[this.undoStack.length - 1];
-    if (!entry) return { ok: false, error: 'nothing_to_undo', message: 'Nothing to undo.' };
+    if (!entry) return { ok: false, error: 'nothing_to_undo', message: 'Nothing to undo yet.' };
     const w = this.world;
     switch (entry.type) {
       case 'place': {
@@ -295,25 +306,25 @@ export class Sim {
           this.undoStack.pop();
           return this.undo(events);
         }
-        if (itemsIn(s).length) return { ok: false, error: 'undo_unsafe', message: 'Cannot undo: it is holding items. Remove it instead.' };
+        if (itemsIn(s).length) return { ok: false, error: 'undo_unsafe', message: 'Undo would drop items, so nothing changed.' };
         this.undoStack.pop();
         delete w.structures[s.id];
         this.index.clear(s.x, s.y);
         w.coins += entry.cost;
-        events.push({ type: 'removed', structureId: s.id, kind: s.kind, recovered: {} });
+        events.push({ type: 'removed', structureId: s.id, kind: s.kind, recovered: {}, refund: entry.cost });
         return { ok: true, ids: [s.id] };
       }
       case 'belt_path': {
         const belts = entry.placed.map((id) => w.structures[id]).filter((s): s is Structure => !!s);
         if (belts.some((s) => itemsIn(s).length)) {
-          return { ok: false, error: 'undo_unsafe', message: 'Cannot undo: those belts are carrying items.' };
+          return { ok: false, error: 'undo_unsafe', message: 'Undo would drop items, so nothing changed.' };
         }
         this.undoStack.pop();
         for (const s of belts) {
           delete w.structures[s.id];
           this.index.clear(s.x, s.y);
           w.coins += STRUCTURES.belt.cost;
-          events.push({ type: 'removed', structureId: s.id, kind: 'belt', recovered: {} });
+          events.push({ type: 'removed', structureId: s.id, kind: 'belt', recovered: {}, refund: STRUCTURES.belt.cost });
         }
         for (const r of entry.rotated) {
           const s = w.structures[r.id];
@@ -325,8 +336,8 @@ export class Sim {
         return { ok: true, ids: belts.map((b) => b.id) };
       }
       case 'remove': {
-        if (this.at(entry.x, entry.y)) return { ok: false, error: 'undo_unsafe', message: 'Cannot undo: that tile is taken now.' };
-        if (w.coins < entry.refund) return { ok: false, error: 'unaffordable', message: 'Cannot undo: not enough coins to rebuild it.' };
+        if (this.at(entry.x, entry.y)) return { ok: false, error: 'undo_unsafe', message: 'That tile is taken now, so nothing changed.' };
+        if (w.coins < entry.refund) return { ok: false, error: 'unaffordable', message: 'Not enough coins to put that back.' };
         this.undoStack.pop();
         const s = makeStructure(w, entry.kind, entry.x, entry.y, entry.facing);
         w.structures[s.id] = s;
@@ -349,10 +360,10 @@ export class Sim {
 
   private basketDrop(kind: ItemKind, x: number, y: number): ActionResult {
     if (!ITEMS[kind]) return { ok: false, error: 'invalid' };
-    if ((this.world.basket[kind] ?? 0) <= 0) return { ok: false, error: 'basket_empty', message: 'Your basket has none of those.' };
+    if ((this.world.basket[kind] ?? 0) <= 0) return { ok: false, error: 'basket_empty', message: 'The basket has none of those.' };
     const s = this.at(x, y);
-    if (!s || s.kind !== 'belt') return { ok: false, error: 'not_a_belt', message: 'Drop basket items onto an empty belt.' };
-    if (s.belt!.item) return { ok: false, error: 'belt_occupied', message: 'That belt already has something on it.' };
+    if (!s || s.kind !== 'belt') return { ok: false, error: 'not_a_belt', message: 'Put that on an empty belt.' };
+    if (s.belt!.item) return { ok: false, error: 'belt_occupied', message: 'That belt is holding something.' };
     const item = newItem(this.world, kind);
     s.belt!.item = item;
     s.belt!.progress = 0;
@@ -366,15 +377,17 @@ export class Sim {
 
   private expand(events: SimEvent[]): ActionResult {
     const w = this.world;
-    if (!w.expansionUnlocked) return { ok: false, error: 'expansion_locked', message: 'The extra garden plot is not available yet.' };
-    if (w.expanded) return { ok: false, error: 'already_expanded', message: 'The garden is already expanded.' };
-    if (w.coins < EXPANSION_COST) return { ok: false, error: 'unaffordable', message: `Expanding costs ${EXPANSION_COST} coins.` };
-    w.coins -= EXPANSION_COST;
-    w.expanded = true;
-    w.width = EXPANDED_GRID.width;
-    w.height = EXPANDED_GRID.height;
+    const plot = plotById(EXPANSION_PLOT_ID)!;
+    if (!w.expansionUnlocked) return { ok: false, error: 'expansion_locked', message: 'More garden opens later.' };
+    if (w.unlockedPlotIds.includes(plot.id)) return { ok: false, error: 'already_expanded', message: 'The far plot is already open.' };
+    if (w.coins < plot.cost) return { ok: false, error: 'unaffordable', message: `Not enough coins. Opening the plot costs ${plot.cost}. You have ${w.coins}.` };
+    w.coins -= plot.cost;
+    w.unlockedPlotIds.push(plot.id);
+    const b = boundsOf(w.unlockedPlotIds);
+    w.cols = b.cols;
+    w.rows = b.rows;
     events.push({ type: 'expanded' });
-    return { ok: true };
+    return { ok: true, message: 'The far plot is open.' };
   }
 
   private pushUndo(entry: UndoEntry): void {

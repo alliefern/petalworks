@@ -5,6 +5,7 @@ export default defineConfig({
   timeout: 90_000,
   retries: 0,
   use: {
+    baseURL: 'http://127.0.0.1:4173',
     headless: true,
     viewport: { width: 1440, height: 900 },
     launchOptions: {

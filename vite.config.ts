@@ -9,6 +9,7 @@ export default defineConfig({
   preview: { port: 4173, strictPort: true, host: '127.0.0.1' },
   build: {
     target: 'es2022',
+    assetsInlineLimit: 0,
     chunkSizeWarningLimit: 1600,
     rollupOptions: {
       output: {

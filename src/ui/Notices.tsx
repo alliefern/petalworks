@@ -1,11 +1,12 @@
 import { store } from '../app/store';
+import { S } from './strings';
 
 export function Notices() {
   const notices = store.ui.notices;
   return (
-    <div className="notices" role="status" aria-live="polite">
+    <div className="notices" role="status" aria-live="polite" aria-atomic="true" aria-label={S.a11y.notices}>
       {notices.map((n) => (
-        <div key={n.id} className={'notice ' + n.tone}>
+        <div key={n.id} className={'notice ' + n.tone} data-testid="notice">
           {n.text}
         </div>
       ))}

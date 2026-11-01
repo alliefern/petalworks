@@ -1,18 +1,83 @@
 /**
- * Tiny synthesized sound set. No audio files exist yet (see ASSET_SPECS §11), so
- * everything here is generated with Web Audio: soft, short, and quiet. When real
- * files land in assets/audio/, swap the bodies of these functions for buffer playback.
+ * Audio: plays the cue set in assets/audio per AUDIO_MANIFEST.md. Ogg is preferred,
+ * MP3 is the fallback for decoders without Vorbis. Nothing sounds until the first
+ * user gesture unlocks Web Audio. Sound and music have separate persisted toggles.
  */
-export type SfxName = 'place' | 'rotate' | 'remove' | 'invalid' | 'pop' | 'deliver' | 'order_complete' | 'unlock' | 'click';
+const OGG = import.meta.glob('../../assets/audio/*.ogg', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const MP3 = import.meta.glob('../../assets/audio/*.mp3', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+
+export type CueKey =
+  | 'ui_click'
+  | 'ui_hover'
+  | 'ui_error'
+  | 'build_place'
+  | 'build_rotate'
+  | 'build_remove'
+  | 'undo'
+  | 'belt_tick'
+  | 'item_pop'
+  | 'flower_bloom'
+  | 'machine_working'
+  | 'blocked'
+  | 'coins'
+  | 'order_complete'
+  | 'unlock'
+  | 'final_celebration'
+  | 'deliver'
+  | 'music';
+
+/** Suggested gains from the manifest. */
+const GAIN: Record<CueKey, number> = {
+  ui_click: 0.55,
+  ui_hover: 0.4,
+  ui_error: 0.5,
+  build_place: 0.62,
+  build_rotate: 0.5,
+  build_remove: 0.55,
+  undo: 0.52,
+  belt_tick: 0.3,
+  item_pop: 0.6,
+  flower_bloom: 0.62,
+  machine_working: 0.38,
+  blocked: 0.46,
+  coins: 0.5,
+  order_complete: 0.7,
+  unlock: 0.68,
+  final_celebration: 0.74,
+  deliver: 0.48,
+  music: 0.42,
+};
+
+const LOOPS: CueKey[] = ['music', 'machine_working', 'belt_tick'];
+
+function findUrl(table: Record<string, string>, name: string): string | undefined {
+  for (const [path, url] of Object.entries(table)) if (path.endsWith('/' + name)) return url;
+  return undefined;
+}
 
 export class AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private sfxGain: GainNode | null = null;
   private musicGain: GainNode | null = null;
-  private musicTimer: number | null = null;
-  soundOn = true;
-  musicOn = true;
-  private unlocked = false;
+  private buffers = new Map<CueKey, AudioBuffer>();
+  private loading = new Map<CueKey, Promise<AudioBuffer | null>>();
+  private loops = new Map<CueKey, { src: AudioBufferSourceNode; gain: GainNode }>();
+  private wantLoop = new Map<CueKey, boolean>();
+  private lastPlay = new Map<CueKey, number>();
+  private useOgg = true;
+  sound = true;
+  music = true;
+  paused = false;
+  unlocked = false;
+
+  constructor() {
+    if (typeof document !== 'undefined') {
+      const probe = document.createElement('audio');
+      const ogg = probe.canPlayType?.('audio/ogg; codecs="vorbis"') ?? '';
+      this.useOgg = ogg === 'probably' || ogg === 'maybe';
+    }
+  }
 
   /** Call from a user gesture. Browsers refuse to start audio otherwise. */
   unlock(): void {
@@ -22,128 +87,131 @@ export class AudioEngine {
       if (!Ctx) return;
       this.ctx = new Ctx();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.5;
+      this.master.gain.value = 1;
       this.master.connect(this.ctx.destination);
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.gain.value = this.sound ? 1 : 0;
+      this.sfxGain.connect(this.master);
       this.musicGain = this.ctx.createGain();
-      this.musicGain.gain.value = this.musicOn ? 0.18 : 0;
+      this.musicGain.gain.value = this.music ? 1 : 0;
       this.musicGain.connect(this.master);
       this.unlocked = true;
       void this.ctx.resume();
-      this.startMusic();
+      // Warm the common cues, then start the music bed.
+      void this.load('music').then(() => this.setLoop('music', true));
+      for (const k of ['ui_click', 'build_place', 'ui_error', 'deliver', 'item_pop'] as CueKey[]) void this.load(k);
     } catch {
       this.ctx = null;
     }
   }
 
+  private url(key: CueKey): string | undefined {
+    return (this.useOgg ? findUrl(OGG, key + '.ogg') : undefined) ?? findUrl(MP3, key + '.mp3') ?? findUrl(OGG, key + '.ogg');
+  }
+
+  private load(key: CueKey): Promise<AudioBuffer | null> {
+    const cached = this.buffers.get(key);
+    if (cached) return Promise.resolve(cached);
+    const pending = this.loading.get(key);
+    if (pending) return pending;
+    const ctx = this.ctx;
+    const url = this.url(key);
+    if (!ctx || !url) return Promise.resolve(null);
+    const p = fetch(url)
+      .then((r) => r.arrayBuffer())
+      .then((ab) => ctx.decodeAudioData(ab))
+      .then((buf) => {
+        this.buffers.set(key, buf);
+        return buf;
+      })
+      .catch(() => null);
+    this.loading.set(key, p);
+    return p;
+  }
+
   setSound(on: boolean): void {
-    this.soundOn = on;
+    this.sound = on;
+    if (this.sfxGain && this.ctx) this.sfxGain.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.05);
+    if (!on) {
+      this.stopLoop('machine_working');
+      this.stopLoop('belt_tick');
+    }
   }
 
   setMusic(on: boolean): void {
-    this.musicOn = on;
-    if (this.musicGain && this.ctx) {
-      this.musicGain.gain.setTargetAtTime(on ? 0.18 : 0, this.ctx.currentTime, 0.2);
+    this.music = on;
+    if (this.musicGain && this.ctx) this.musicGain.gain.setTargetAtTime(on ? (this.paused ? 0.35 : 1) : 0, this.ctx.currentTime, 0.2);
+    if (on) this.setLoop('music', true);
+    else this.stopLoop('music');
+  }
+
+  /** Fade music down and stop the factory loops while paused. */
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    if (this.musicGain && this.ctx && this.music) this.musicGain.gain.setTargetAtTime(paused ? 0.35 : 1, this.ctx.currentTime, 0.25);
+    if (paused) {
+      this.stopLoop('machine_working');
+      this.stopLoop('belt_tick');
     }
   }
 
-  private tone(freq: number, dur: number, type: OscillatorType, vol: number, when = 0, dest?: AudioNode): void {
-    if (!this.ctx || !this.master) return;
-    const t0 = this.ctx.currentTime + when;
-    const osc = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    osc.type = type;
-    osc.frequency.value = freq;
-    g.gain.setValueAtTime(0, t0);
-    g.gain.linearRampToValueAtTime(vol, t0 + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    osc.connect(g);
-    g.connect(dest ?? this.master);
-    osc.start(t0);
-    osc.stop(t0 + dur + 0.05);
+  play(key: CueKey, opts: { throttleMs?: number; delay?: number } = {}): void {
+    if (!this.ctx || !this.sfxGain) return;
+    if (key !== 'music' && !this.sound) return;
+    const now = performance.now();
+    const throttle = opts.throttleMs ?? 40;
+    if (now - (this.lastPlay.get(key) ?? -1e9) < throttle) return;
+    this.lastPlay.set(key, now);
+    void this.load(key).then((buf) => {
+      if (!buf || !this.ctx || !this.sfxGain) return;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      const g = this.ctx.createGain();
+      g.gain.value = GAIN[key];
+      src.connect(g);
+      g.connect(this.sfxGain);
+      src.start(this.ctx.currentTime + (opts.delay ?? 0));
+    });
   }
 
-  private noise(dur: number, vol: number, hp = 800): void {
-    if (!this.ctx || !this.master) return;
-    const len = Math.floor(this.ctx.sampleRate * dur);
-    const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    const src = this.ctx.createBufferSource();
-    src.buffer = buf;
-    const f = this.ctx.createBiquadFilter();
-    f.type = 'highpass';
-    f.frequency.value = hp;
-    const g = this.ctx.createGain();
-    g.gain.value = vol;
-    src.connect(f);
-    f.connect(g);
-    g.connect(this.master);
-    src.start();
+  hover(): void {
+    this.play('ui_hover', { throttleMs: 80 });
   }
 
-  play(name: SfxName): void {
-    if (!this.soundOn || !this.ctx) return;
-    switch (name) {
-      case 'place':
-        this.tone(220, 0.09, 'triangle', 0.25);
-        this.noise(0.05, 0.08, 2000);
-        break;
-      case 'rotate':
-        this.tone(660, 0.05, 'square', 0.06);
-        break;
-      case 'remove':
-        this.noise(0.12, 0.12, 1200);
-        this.tone(180, 0.12, 'sine', 0.12);
-        break;
-      case 'invalid':
-        this.tone(140, 0.18, 'sine', 0.2);
-        this.tone(120, 0.18, 'triangle', 0.1, 0.02);
-        break;
-      case 'pop':
-        this.tone(520, 0.08, 'sine', 0.18);
-        this.tone(780, 0.07, 'sine', 0.1, 0.03);
-        break;
-      case 'deliver':
-        this.noise(0.08, 0.07, 3000);
-        this.tone(880, 0.06, 'sine', 0.08, 0.02);
-        break;
-      case 'order_complete':
-        this.tone(523, 0.35, 'sine', 0.2);
-        this.tone(659, 0.35, 'sine', 0.2, 0.12);
-        this.tone(784, 0.6, 'sine', 0.2, 0.24);
-        this.tone(1047, 0.8, 'triangle', 0.08, 0.36);
-        break;
-      case 'unlock':
-        for (let i = 0; i < 5; i++) this.tone(600 + i * 120, 0.12, 'sine', 0.1, i * 0.05);
-        break;
-      case 'click':
-        this.tone(900, 0.03, 'square', 0.03);
-        break;
+  /** Start or stop one of the three loops. Only ever one instance of each. */
+  setLoop(key: CueKey, on: boolean): void {
+    if (!LOOPS.includes(key)) return;
+    this.wantLoop.set(key, on);
+    if (!on) {
+      this.stopLoop(key);
+      return;
     }
+    if (this.loops.has(key) || !this.ctx) return;
+    if (key === 'music' ? !this.music : !this.sound || this.paused) return;
+    void this.load(key).then((buf) => {
+      if (!buf || !this.ctx || this.loops.has(key) || !this.wantLoop.get(key)) return;
+      if (key === 'music' ? !this.music : !this.sound || this.paused) return;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const g = this.ctx.createGain();
+      g.gain.value = GAIN[key];
+      src.connect(g);
+      g.connect(key === 'music' ? this.musicGain! : this.sfxGain!);
+      src.start();
+      this.loops.set(key, { src, gain: g });
+    });
   }
 
-  /** Very gentle pentatonic plucks over a soft pad; stops when music is off (gain 0). */
-  private startMusic(): void {
-    if (!this.ctx || !this.musicGain || this.musicTimer !== null) return;
-    const scale = [261.6, 293.7, 329.6, 392.0, 440.0, 523.3, 587.3];
-    const pad = this.ctx.createOscillator();
-    pad.type = 'sine';
-    pad.frequency.value = 130.8;
-    const padGain = this.ctx.createGain();
-    padGain.gain.value = 0.12;
-    pad.connect(padGain);
-    padGain.connect(this.musicGain);
-    pad.start();
-    const step = () => {
-      if (!this.ctx || !this.musicGain) return;
-      if (this.musicOn && Math.random() < 0.7) {
-        const f = scale[Math.floor(Math.random() * scale.length)];
-        this.tone(f, 1.4, 'sine', 0.35, 0, this.musicGain);
-        if (Math.random() < 0.3) this.tone(f * 1.5, 1.2, 'sine', 0.15, 0.2, this.musicGain);
-      }
-      this.musicTimer = window.setTimeout(step, 900 + Math.random() * 1400);
-    };
-    this.musicTimer = window.setTimeout(step, 600);
+  private stopLoop(key: CueKey): void {
+    const l = this.loops.get(key);
+    if (!l) return;
+    try {
+      l.src.stop();
+    } catch {
+      /* already stopped */
+    }
+    this.loops.delete(key);
   }
 }
 

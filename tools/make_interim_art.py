@@ -325,12 +325,10 @@ def grass_variants() -> None:
         ln = rnd.uniform(9, 16)
         a = -math.pi / 2 + rnd.uniform(-0.6, 0.6)
         line(d, [(x, y), (x + math.cos(a) * ln, y + math.sin(a) * ln)], rgba(shade("moss", 0.8), 170), 2)
-    # twine edge
-    for i in range(0, 128, 10):
-        line(d, [(i, 3), (i + 5, 3)], rgba("kraft", 200), 2)
-        line(d, [(i, 125), (i + 5, 125)], rgba("kraft", 200), 2)
-        line(d, [(3, i), (3, i + 5)], rgba("kraft", 200), 2)
-        line(d, [(125, i), (125, i + 5)], rgba("kraft", 200), 2)
+    # A few wild seed heads instead of a per-tile border (a border would read as a grid).
+    for (x, y) in ((30, 40), (88, 70), (58, 100)):
+        line(d, [(x, y + 14), (x + 2, y)], rgba(shade("moss", 0.7)), 2)
+        ellipse(d, x + 2, y - 2, 3.5, 2.5, rgba("kraft", 210))
     save(lk, "ground_locked.png")
 
 

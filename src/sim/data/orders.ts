@@ -1,71 +1,80 @@
 import type { OrderDef } from '../types';
 
 /**
- * Hand-authored order sequence. Each order unlocks the tools needed for it
- * the moment it becomes active, so nothing required is ever locked.
+ * Hand-authored order sequence. Each order unlocks the tools needed for it the moment
+ * it becomes active, so nothing required is ever locked. Rewards follow BALANCE.md.
+ * Customer names and notes are placeholders until the copy pass (docs/content/COPY.md).
  */
 export const ORDERS: OrderDef[] = [
   {
-    id: 'o1_daisies',
-    customer: 'Mrs. Alder next door',
-    title: 'Two fresh daisies',
-    note: 'Just a couple of daisies for the kitchen table, dear.',
+    id: 'order1',
+    customer: 'Nell',
+    title: '2 Daisies',
+    note: 'Two loose daisies. I keep one glass by the sink.',
     requires: { daisy: 2 },
-    reward: 30,
-    unlocks: ['belt', 'daisy_bed', 'packing_station'],
-    hint: 'Place a Daisy Bed, run a belt from its chute to a Packing Station, and wait for daisies to grow.',
+    reward: 50,
+    unlocks: ['daisy_bed', 'belt', 'bundling_table'],
+    hint: 'Place a Daisy Bed, run a belt from its chute to the Packing Station, and wait for daisies to grow.',
   },
   {
-    id: 'o2_bundles',
-    customer: 'The corner cafe',
-    title: 'Two daisy bundles',
-    note: 'Little bundles for the tables, tied with twine please.',
+    id: 'order2',
+    customer: 'Otto',
+    title: '2 Daisy Bundles',
+    note: 'Bundle them, please. Loose stems make a mess of my satchel.',
     requires: { daisy_bundle: 2 },
-    reward: 45,
-    unlocks: ['bundling_table'],
-    hint: 'Route daisies into a Bundling Table. It ties two daisies into a bundle and pushes it out its tray side.',
+    reward: 70,
+    unlocks: [],
+    hint: 'Route daisies into a Bundling Table. It ties two into a bundle and pushes it out of the side it faces.',
   },
   {
-    id: 'o3_more_bundles',
-    customer: 'Spring fair committee',
-    title: 'Four daisy bundles',
-    note: 'The fair is Saturday. We need bundles for every stall!',
+    id: 'order3',
+    customer: 'Hester',
+    title: '4 Daisy Bundles',
+    note: 'Four bundles for the counter. Saturday gets busy.',
     requires: { daisy_bundle: 4 },
-    reward: 80,
+    reward: 100,
     unlocks: [],
     hint: 'A second Daisy Bed feeding the same table doubles your bundle output.',
   },
   {
-    id: 'o4_lavender',
-    customer: 'Grandpa Jun',
-    title: 'Two lavender sprigs',
-    note: 'For under the pillow. Helps me sleep.',
+    id: 'order4',
+    customer: 'Ivo',
+    title: '2 Lavender',
+    note: "Leave them loose. I'll take the sprigs as they are.",
     requires: { lavender: 2 },
-    reward: 60,
+    reward: 80,
     unlocks: ['lavender_bed'],
     unlocksExpansion: true,
-    hint: 'Lavender Beds are now available. Lavender grows a little slower than daisies.',
+    hint: 'Lavender Beds are available now. Lavender grows a little slower than daisies.',
   },
   {
-    id: 'o5_sachets',
-    customer: 'The linen shop',
-    title: 'Two lavender sachets',
-    note: 'Dried and bagged, for the drawers.',
+    id: 'order5',
+    customer: 'Pia',
+    title: '2 Lavender Sachets',
+    note: 'Two sachets for the linen shelf, when you have them.',
     requires: { lavender_sachet: 2 },
-    reward: 100,
+    reward: 110,
     unlocks: ['drying_bench'],
-    hint: 'A Drying Bench turns two lavender into a sachet. Build a second chain beside your daisy line.',
+    hint: 'A Drying Bench turns two lavender into a sachet. Build a second line beside your daisy line.',
   },
   {
-    id: 'o6_bouquet',
-    customer: 'A wedding in the meadow',
-    title: 'One mixed bouquet',
-    note: 'Daisies and lavender together. Make it lovely.',
+    id: 'order6',
+    customer: 'Ada',
+    title: '1 Mixed Bouquet',
+    note: 'One bouquet for the table. Daisies and lavender together.',
     requires: { mixed_bouquet: 1 },
-    reward: 160,
+    reward: 140,
     unlocks: ['arrangement_table'],
-    hint: 'The Arrangement Table takes a Daisy Bundle and a Lavender Sachet from any side and outputs a bouquet.',
+    hint: 'The Arrangement Table takes a Daisy Bundle and a Lavender Sachet from any side and sends out a bouquet.',
   },
 ];
 
 export const ORDER_COUNT = ORDERS.length;
+
+export function orderById(id: string | null): OrderDef | null {
+  return id ? (ORDERS.find((o) => o.id === id) ?? null) : null;
+}
+
+export function orderIndex(id: string | null): number {
+  return id ? ORDERS.findIndex((o) => o.id === id) : ORDERS.length;
+}

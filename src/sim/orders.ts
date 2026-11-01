@@ -1,27 +1,30 @@
-import { ORDERS } from './data/orders';
+import { ORDERS, orderById } from './data/orders';
 import { STRUCTURE_KINDS } from './data/structures';
 import type { OrderDef, SimEvent, World } from './types';
 
 export function currentOrder(world: World): OrderDef | null {
-  return ORDERS[world.orderIndex] ?? null;
+  return orderById(world.orders.activeId);
 }
 
 export function isSandbox(world: World): boolean {
-  return world.orderIndex >= ORDERS.length;
+  return world.orders.activeId === null;
 }
 
 export function orderIsComplete(world: World): boolean {
   const order = currentOrder(world);
   if (!order) return false;
   for (const [kind, need] of Object.entries(order.requires)) {
-    if ((world.orderProgress[kind as keyof typeof world.orderProgress] ?? 0) < (need ?? 0)) return false;
+    if ((world.orders.progress.delivered[kind as keyof typeof order.requires] ?? 0) < (need ?? 0)) return false;
   }
   return true;
 }
 
-/** Make the order at world.orderIndex active: apply its unlocks, then allocate any stock. */
-export function startCurrentOrder(world: World, events: SimEvent[]): void {
-  const order = currentOrder(world);
+/** Make `id` the active order (or enter sandbox with null): apply unlocks, then allocate stock. */
+export function startOrder(world: World, id: string | null, events: SimEvent[]): void {
+  world.orders.activeId = id;
+  world.orders.offeredIds = id ? [id] : [];
+  world.orders.progress = { orderId: id, delivered: {} };
+  const order = orderById(id);
   if (!order) {
     // Sandbox: everything opens up.
     const newly = STRUCTURE_KINDS.filter((k) => !world.unlocked.includes(k));
@@ -37,7 +40,6 @@ export function startCurrentOrder(world: World, events: SimEvent[]): void {
   const exp = !!order.unlocksExpansion && !world.expansionUnlocked;
   if (exp) world.expansionUnlocked = true;
   if (newly.length || exp) events.push({ type: 'unlocked', kinds: newly, expansion: exp });
-  world.orderProgress = {};
   allocateStock(world, events);
 }
 
@@ -46,14 +48,15 @@ export function allocateStock(world: World, events: SimEvent[]): void {
   const order = currentOrder(world);
   if (!order) return;
   let progressed = false;
+  const delivered = world.orders.progress.delivered;
   for (const [kindRaw, need] of Object.entries(order.requires)) {
     const kind = kindRaw as keyof typeof order.requires;
-    const have = world.orderProgress[kind] ?? 0;
+    const have = delivered[kind] ?? 0;
     const want = (need ?? 0) - have;
     const inStock = world.stock[kind] ?? 0;
     const take = Math.min(want, inStock);
     if (take > 0) {
-      world.orderProgress[kind] = have + take;
+      delivered[kind] = have + take;
       world.stock[kind] = inStock - take;
       if (world.stock[kind] === 0) delete world.stock[kind];
       progressed = true;
@@ -63,9 +66,10 @@ export function allocateStock(world: World, events: SimEvent[]): void {
   if (orderIsComplete(world)) {
     world.coins += order.reward;
     world.stats.coinsEarned += order.reward;
-    world.completedOrders.push(order.id);
-    world.orderIndex += 1;
-    events.push({ type: 'order_complete', orderId: order.id, reward: order.reward });
-    startCurrentOrder(world, events);
+    world.orders.completedIds.push(order.id);
+    const idx = ORDERS.indexOf(order);
+    const next = ORDERS[idx + 1]?.id ?? null;
+    events.push({ type: 'order_complete', orderId: order.id, reward: order.reward, final: next === null });
+    startOrder(world, next, events);
   }
 }

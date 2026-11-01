@@ -43,3 +43,9 @@ The voice and capitalization pass on docs/content/ is merged (PR #9). docs/conte
 2. Toasts stack up 4 deep at the top center and cover the garden. Cap visible toasts at 2, merge repeated coin-refund toasts, and keep the blocked warning near the building, not as a big banner.
 3. The status bubble icons ("...", "!") are tiny. Follow docs/design/ACCESSIBILITY.md: ink glyphs on cream discs, readable at 100% zoom.
 4. The tip card and order card both float over the yard. Make sure neither covers the playable grid at 1366x768.
+
+## 2026-11-01 16:47 UK: most of the final art landed
+- 149 more accepted sprites are in `assets/art/` (untracked, commit them with your next commit): every belt frame (straight, corner cw/ccw 0..7, belt_end), daisy and lavender beds in all four facings and states, the bundling table, drying bench and arrangement table in all facings and frames, the hedge edges and corners, ground_locked, all five items (the daisy bundle is now bigger), tile_valid/invalid/select, and the four status badges.
+- The badges have the spec's cream glyph painted in. Keep the accessibility plan's ink glyph on a cream disc drawn on top; it should cover the painted one cleanly. Check it reads at 1x.
+- Still to come from the art team: the UI icons (only a few exist, so I'm holding them so the toolbar doesn't mix styles), decor, and fx petals/sparkle/ring. Interim stays for those.
+- After wiring copy and balance, take fresh screenshots (first chain and all machines) so I can check scale, centering of 144×144 sprites with the overhang, and belt animation direction against the ports.

@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { BELT_TICKS, EXPANSION_COST, START_COINS, STOCK_CAP } from './data/balance';
+import { BELT_TICKS, INPUT_BUFFER_PER_INGREDIENT, PACKING_START, START_COINS, STOCK_CAP } from './data/balance';
+import { PLOTS } from './data/plots';
 import { ORDERS } from './data/orders';
 import { RECIPES } from './data/recipes';
 import { STRUCTURES } from './data/structures';
-import { countAllItems, createWorld, Sim, totalCount } from './game';
+import { countAllItems, createWorld, makeStructure, Sim, totalCount } from './game';
 import { currentOrder, isSandbox } from './orders';
-import { deserialize, DEFAULT_UI_STATE, serialize } from './save';
+import { deserialize, DEFAULT_SETTINGS, SCHEMA_VERSION, serialize } from './save';
 import type { Dir, ItemKind, SimEvent, StructureKind } from './types';
+
+const EXPANSION_COST = PLOTS[1].cost;
+const orderIdx = (sim: Sim) => (sim.world.orders.activeId ? ORDERS.findIndex((o) => o.id === sim.world.orders.activeId) : ORDERS.length);
+const packingId = (sim: Sim) => Object.values(sim.world.structures).find((x) => x.kind === 'packing_station')!.id;
 
 const E: Dir = 1;
 const S: Dir = 2;
@@ -19,6 +24,14 @@ function rich(): Sim {
   sim.world.coins = 10_000;
   sim.world.unlocked = Object.keys(STRUCTURES) as StructureKind[];
   return sim;
+}
+
+/** Tests that place their own Packing Station bypass `buildable` the way a scenario file would. */
+function placePacking(sim: Sim, x: number, y: number): number {
+  const s = makeStructure(sim.world, 'packing_station', x, y, 0);
+  sim.world.structures[s.id] = s;
+  sim.index.set(s);
+  return s.id;
 }
 
 function place(sim: Sim, kind: StructureKind, x: number, y: number, facing: Dir = E): number {
@@ -52,27 +65,33 @@ describe('fresh world', () => {
   it('starts with the first order and its unlocks only', () => {
     const sim = new Sim();
     expect(sim.world.coins).toBe(START_COINS);
-    expect(currentOrder(sim.world)?.id).toBe('o1_daisies');
+    expect(currentOrder(sim.world)?.id).toBe('order1');
     expect(sim.isUnlocked('daisy_bed')).toBe(true);
     expect(sim.isUnlocked('belt')).toBe(true);
-    expect(sim.isUnlocked('packing_station')).toBe(true);
-    expect(sim.isUnlocked('bundling_table')).toBe(false);
+    expect(sim.isUnlocked('bundling_table')).toBe(true);
     expect(sim.isUnlocked('lavender_bed')).toBe(false);
+    // The Packing Station is pre-placed, free, and cannot be built or removed.
+    const packing = sim.at(PACKING_START.x, PACKING_START.y);
+    expect(packing?.kind).toBe('packing_station');
+    expect(sim.dispatch({ type: 'place', kind: 'packing_station', x: 1, y: 1, facing: E }).error).toBe('not_buildable');
+    expect(sim.dispatch({ type: 'remove', id: packing!.id }).error).toBe('not_removable');
+    expect(sim.at(PACKING_START.x, PACKING_START.y)).toBeTruthy();
   });
 
   it('cannot place locked structures or spend what it does not have', () => {
     const sim = new Sim();
-    expect(sim.dispatch({ type: 'place', kind: 'bundling_table', x: 1, y: 1, facing: E }).error).toBe('locked');
+    expect(sim.dispatch({ type: 'place', kind: 'lavender_bed', x: 1, y: 1, facing: E }).error).toBe('locked');
     sim.world.coins = 5;
     expect(sim.dispatch({ type: 'place', kind: 'daisy_bed', x: 1, y: 1, facing: E }).error).toBe('unaffordable');
-    expect(Object.keys(sim.world.structures)).toHaveLength(0);
+    expect(Object.values(sim.world.structures).filter((x) => x.kind !== 'packing_station')).toHaveLength(0);
   });
 
   it('rejects out-of-bounds and occupied tiles', () => {
     const sim = rich();
     place(sim, 'daisy_bed', 2, 2);
     expect(sim.dispatch({ type: 'place', kind: 'belt', x: 2, y: 2, facing: E }).error).toBe('occupied');
-    expect(sim.dispatch({ type: 'place', kind: 'belt', x: 16, y: 2, facing: E }).error).toBe('out_of_bounds');
+    expect(sim.dispatch({ type: 'place', kind: 'belt', x: 16, y: 2, facing: E }).error).toBe('locked_plot');
+    expect(sim.dispatch({ type: 'place', kind: 'belt', x: 25, y: 2, facing: E }).error).toBe('out_of_bounds');
     expect(sim.dispatch({ type: 'place', kind: 'belt', x: -1, y: 2, facing: E }).error).toBe('out_of_bounds');
   });
 });
@@ -119,7 +138,8 @@ describe('producers and belts', () => {
     run(sim, STRUCTURES.daisy_bed.growTicks!);
     const p = sim.world.structures[bed].producer!;
     expect(p.output).toBeTruthy();
-    expect(p.blocked).toBe(true);
+    expect(p.blockedTicks).toBeGreaterThan(0);
+    expect(p.block).toBe('queue');
     const before = p.growTicks;
     run(sim, 10);
     expect(p.growTicks).toBe(before); // paused, not accumulating
@@ -179,7 +199,7 @@ describe('producers and belts', () => {
     expect(ids.every((id) => sim.world.structures[id].belt!.item)).toBe(true);
     const first = sim.world.structures[ids[0]].belt!.item!.id;
     const second = sim.world.structures[ids[1]].belt!.item!.id;
-    place(sim, 'packing_station', 4, 0);
+    placePacking(sim, 4, 0);
     run(sim, 1);
     // Head delivered, and the two behind each advanced one tile in the same tick
     // (the bed, which was blocked, then refills the first tile).
@@ -187,7 +207,7 @@ describe('producers and belts', () => {
     expect(sim.world.structures[ids[1]].belt!.item!.id).toBe(first);
     expect(sim.world.structures[ids[0]].belt!.item!.id).not.toBe(first);
     // The delivered daisy went straight into the active order.
-    expect(sim.world.orderProgress.daisy).toBe(1);
+    expect(sim.world.orders.progress.delivered.daisy).toBe(1);
   });
 });
 
@@ -202,7 +222,7 @@ describe('processors', () => {
     run(sim, 1);
     expect(m.workTicks).toBe(0);
     expect(m.inputs).toHaveLength(0);
-    run(sim, RECIPES.daisy_bundle.ticks - 1);
+    run(sim, RECIPES.daisy_bundle.durationTicks - 1);
     expect(m.outputs).toHaveLength(0);
     run(sim, 1);
     // Crafted and pushed out in the same tick.
@@ -222,16 +242,16 @@ describe('processors', () => {
     const sim2 = rich();
     const table = place(sim2, 'bundling_table', 2, 0, E);
     const m = sim2.world.structures[table].processor!;
-    // Fill to capacity (2 × recipe need) and hold crafting by filling the output buffer too.
-    m.inputs.push({ id: 1, kind: 'daisy' }, { id: 2, kind: 'daisy' }, { id: 3, kind: 'daisy' }, { id: 4, kind: 'daisy' });
-    m.outputs.push({ id: 5, kind: 'daisy_bundle' }, { id: 6, kind: 'daisy_bundle' });
+    // Fill the daisy slot to capacity and hold crafting by filling the output slot too.
+    for (let i = 0; i < INPUT_BUFFER_PER_INGREDIENT; i++) m.inputs.push({ id: 10 + i, kind: 'daisy' });
+    m.outputs.push({ id: 5, kind: 'daisy_bundle' });
     sim2.world.nextItemId = 100;
     place(sim2, 'daisy_bed', 0, 0, E);
     belts(sim2, [1, 0], [1, 0], E);
     run(sim2, STRUCTURES.daisy_bed.growTicks! + BELT_TICKS + 1);
     expect(sim2.at(1, 0)!.belt!.block).toBe('buffer_full');
-    expect(m.workTicks).toBeNull(); // output buffer full, no crafting
-    expect(m.blocked).toBe(true);
+    expect(m.workTicks).toBeNull(); // output slot full, no crafting
+    expect(m.blockedTicks).toBeGreaterThan(0);
   });
 
   it('arrangement table takes both inputs from any side and makes a bouquet', () => {
@@ -244,7 +264,7 @@ describe('processors', () => {
     sim.world.structures[wb].belt!.item = { id: 1, kind: 'daisy_bundle' };
     sim.world.structures[nb].belt!.item = { id: 2, kind: 'lavender_sachet' };
     sim.world.nextItemId = 3;
-    run(sim, BELT_TICKS + 1 + RECIPES.mixed_bouquet.ticks);
+    run(sim, BELT_TICKS + 1 + RECIPES.mixed_bouquet.durationTicks);
     expect(sim.world.structures[out].belt!.item?.kind).toBe('mixed_bouquet');
     expect(sim.world.structures[t].processor!.inputs).toHaveLength(0);
   });
@@ -253,84 +273,89 @@ describe('processors', () => {
 describe('orders and economy', () => {
   it('completes order 1 from real deliveries, pays, and unlocks the bundling table', () => {
     const sim = new Sim();
-    place(sim, 'daisy_bed', 0, 0, E);
-    belts(sim, [1, 0], [2, 0], E);
-    place(sim, 'packing_station', 3, 0);
+    // Bed at the pre-placed station's west side, two belts between.
+    const px = PACKING_START.x;
+    const py = PACKING_START.y;
+    place(sim, 'daisy_bed', px - 3, py, E);
+    belts(sim, [px - 2, py], [px - 1, py], E);
     const coinsAfterBuild = sim.world.coins;
-    expect(coinsAfterBuild).toBe(START_COINS - 20 - 4 - 15);
+    expect(coinsAfterBuild).toBe(START_COINS - 20 - 4);
     const events = run(sim, 200);
-    expect(events.some((e) => e.type === 'order_complete' && e.orderId === 'o1_daisies')).toBe(true);
-    expect(currentOrder(sim.world)?.id).toBe('o2_bundles');
+    expect(events.some((e) => e.type === 'order_complete' && e.orderId === 'order1')).toBe(true);
+    expect(currentOrder(sim.world)?.id).toBe('order2');
     expect(sim.world.coins).toBe(coinsAfterBuild + ORDERS[0].reward);
-    expect(sim.isUnlocked('bundling_table')).toBe(true);
+    expect(sim.world.orders.completedIds).toEqual(['order1']);
   });
 
   it('packing station never counts items that were not delivered, and caps stock', () => {
     const sim = rich();
-    sim.world.orderIndex = 1; // order 2 needs bundles, daisies are surplus
+    sim.world.orders.activeId = 'order2'; // order 2 needs bundles, daisies are surplus
+    sim.world.orders.progress = { orderId: 'order2', delivered: {} };
     place(sim, 'daisy_bed', 0, 0, E);
     belts(sim, [1, 0], [1, 0], E);
-    place(sim, 'packing_station', 2, 0);
+    placePacking(sim, 2, 0);
     run(sim, 2000);
     expect(sim.world.stock.daisy).toBe(STOCK_CAP);
     expect(sim.at(1, 0)!.belt!.block).toBe('stock_full');
-    expect(sim.world.orderProgress.daisy_bundle ?? 0).toBe(0);
+    expect(sim.world.orders.progress.delivered.daisy_bundle ?? 0).toBe(0);
   });
 
   it('plays all six orders through actual production chains and reaches sandbox', () => {
     const sim = new Sim();
-    // Daisy line: bed -> belt -> bundling table -> belt -> packing
-    place(sim, 'daisy_bed', 0, 0, E);
-    belts(sim, [1, 0], [1, 0], E);
-    place(sim, 'packing_station', 2, 0);
-    runUntil(sim, () => sim.world.orderIndex === 1, 300);
-    // Rebuild for bundles: remove packing, insert a table.
-    sim.dispatch({ type: 'remove', id: sim.at(2, 0)!.id });
-    place(sim, 'bundling_table', 2, 0, E);
-    belts(sim, [3, 0], [3, 0], E);
-    place(sim, 'packing_station', 4, 0);
-    runUntil(sim, () => sim.world.orderIndex === 2, 1500);
-    runUntil(sim, () => sim.world.orderIndex === 3, 2500);
+    const px = PACKING_START.x; // 13
+    const py = PACKING_START.y; // 6
+    // Order 1: bed -> belt -> packing (from the west).
+    place(sim, 'daisy_bed', px - 2, py, E);
+    belts(sim, [px - 1, py], [px - 1, py], E);
+    runUntil(sim, () => orderIdx(sim) === 1, 300);
+    // Orders 2-3: insert a bundling table: bed (px-3) -> belt (px-2) -> table (px-1) -> packing.
+    sim.dispatch({ type: 'remove', id: sim.at(px - 1, py)!.id });
+    sim.dispatch({ type: 'remove', id: sim.at(px - 2, py)!.id });
+    place(sim, 'daisy_bed', px - 3, py, E);
+    belts(sim, [px - 2, py], [px - 2, py], E);
+    place(sim, 'bundling_table', px - 1, py, E);
+    runUntil(sim, () => orderIdx(sim) === 2, 1500);
+    runUntil(sim, () => orderIdx(sim) === 3, 2500);
     expect(sim.isUnlocked('lavender_bed')).toBe(true);
     expect(sim.world.expansionUnlocked).toBe(true);
-    // Lavender line into the same packing station from the south.
-    place(sim, 'lavender_bed', 4, 3, N);
-    belts(sim, [4, 2], [4, 2], N);
-    belts(sim, [4, 1], [4, 1], N);
-    runUntil(sim, () => sim.world.orderIndex === 4, 1500);
+    // Order 4: lavender line into the packing station from the south.
+    place(sim, 'lavender_bed', px, py + 3, N);
+    belts(sim, [px, py + 2], [px, py + 2], N);
+    belts(sim, [px, py + 1], [px, py + 1], N);
+    runUntil(sim, () => orderIdx(sim) === 4, 1500);
     expect(sim.isUnlocked('drying_bench')).toBe(true);
-    // Insert drying bench at (4,2): remove belt, place bench facing north.
-    sim.dispatch({ type: 'remove', id: sim.at(4, 2)!.id });
-    place(sim, 'drying_bench', 4, 2, N);
-    runUntil(sim, () => sim.world.orderIndex === 5, 3000);
+    // Order 5: drying bench replaces the middle belt.
+    sim.dispatch({ type: 'remove', id: sim.at(px, py + 2)!.id });
+    place(sim, 'drying_bench', px, py + 2, N);
+    runUntil(sim, () => orderIdx(sim) === 5, 3000);
     expect(sim.isUnlocked('arrangement_table')).toBe(true);
-    // Bouquet: route bundles east and sachets north into an arrangement table at (4,1)... rebuild:
-    // bundling table (2,0) -> belt (3,0) -> arrangement table at (4,0)? packing is at (4,0).
-    // Move packing to (5,0): arrangement table at (4,0) facing east, fed from west (bundles) and south (sachets via (4,1) belt N).
-    sim.dispatch({ type: 'remove', id: sim.at(4, 0)!.id });
-    place(sim, 'arrangement_table', 4, 0, E);
-    place(sim, 'packing_station', 5, 0);
-    const before = totalCount(countAllItems(sim.world));
-    expect(before).toBeGreaterThanOrEqual(0);
-    runUntil(sim, () => sim.world.orderIndex === 6, 6000);
+    // Order 6: arrangement table east of the station? The station is fixed, so put the table
+    // where bundles and sachets both arrive: replace belt (px, py+1) with the table facing north
+    // into packing; bundles come from the west via a belt turned south... simpler: move the daisy
+    // line to feed the table from the west at (px-1, py+1).
+    sim.dispatch({ type: 'remove', id: sim.at(px, py + 1)!.id });
+    place(sim, 'arrangement_table', px, py + 1, N);
+    sim.dispatch({ type: 'rotate', id: sim.at(px - 1, py)!.id, facing: S }); // bundling table now outputs south into (px-1, py+1)
+    belts(sim, [px - 1, py + 1], [px - 1, py + 1], E); // belt carries bundles east into the table
+    runUntil(sim, () => orderIdx(sim) === 6, 8000);
     expect(isSandbox(sim.world)).toBe(true);
-    expect(sim.world.completedOrders).toHaveLength(6);
+    expect(sim.world.orders.completedIds).toHaveLength(6);
+    expect(sim.world.orders.activeId).toBeNull();
     // Sandbox: deliveries sell for coins.
     const coins = sim.world.coins;
     run(sim, 600);
     expect(sim.world.coins).toBeGreaterThan(coins);
-    expect(sim.world.coins).toBeGreaterThan(0);
   });
 
   it('is never unaffordable: cumulative rewards cover the minimal chain for every order', () => {
     // Minimal equipment per order (one of each needed structure, no belts; belts refund fully anyway).
     const need: StructureKind[][] = [
-      ['daisy_bed', 'packing_station'],
-      ['daisy_bed', 'bundling_table', 'packing_station'],
-      ['daisy_bed', 'bundling_table', 'packing_station'],
-      ['lavender_bed', 'packing_station'],
-      ['lavender_bed', 'drying_bench', 'packing_station'],
-      ['daisy_bed', 'bundling_table', 'lavender_bed', 'drying_bench', 'arrangement_table', 'packing_station'],
+      ['daisy_bed'],
+      ['daisy_bed', 'bundling_table'],
+      ['daisy_bed', 'bundling_table'],
+      ['lavender_bed'],
+      ['lavender_bed', 'drying_bench'],
+      ['daisy_bed', 'bundling_table', 'lavender_bed', 'drying_bench', 'arrangement_table'],
     ];
     let wealth = START_COINS;
     need.forEach((kinds, i) => {
@@ -348,9 +373,13 @@ describe('orders and economy', () => {
     expect(sim.dispatch({ type: 'expand' }).error).toBe('unaffordable');
     sim.world.coins = EXPANSION_COST;
     expect(sim.dispatch({ type: 'expand' }).ok).toBe(true);
-    expect(sim.world.width).toBe(20);
-    expect(sim.world.height).toBe(14);
+    expect(sim.world.cols).toBe(20);
+    expect(sim.world.rows).toBe(14);
+    expect(sim.world.unlockedPlotIds).toEqual(['potting', 'south-rim']);
     expect(sim.world.coins).toBe(0);
+    expect(sim.dispatch({ type: 'place', kind: 'belt', x: 18, y: 13, facing: E }).error).toBe('unaffordable');
+    sim.world.coins = 10;
+    expect(sim.dispatch({ type: 'place', kind: 'belt', x: 18, y: 13, facing: E }).ok).toBe(true);
     expect(sim.dispatch({ type: 'expand' }).error).toBe('already_expanded');
   });
 });
@@ -368,14 +397,19 @@ describe('editing: rotate, remove, undo, basket', () => {
     expect(sim.world.structures[b].belt!.from).not.toBe(W);
   });
 
-  it('removing refunds fully and moves held items to the basket; basket drops back onto belts', () => {
+  it('removing refunds per the definition (belts 100%, buildings 75%) and moves held items to the basket; basket drops back onto belts', () => {
     const sim = rich();
     const coins = sim.world.coins;
     const t = place(sim, 'bundling_table', 2, 2, E);
     sim.world.structures[t].processor!.inputs.push({ id: 1, kind: 'daisy' });
     const r = sim.dispatch({ type: 'remove', id: t });
     expect(r.ok).toBe(true);
-    expect(sim.world.coins).toBe(coins);
+    expect(r.refund).toBe(STRUCTURES.bundling_table.refund);
+    expect(sim.world.coins).toBe(coins - STRUCTURES.bundling_table.cost + STRUCTURES.bundling_table.refund);
+    const b0 = belts(sim, [7, 7], [7, 7], E)[0];
+    const before = sim.world.coins;
+    sim.dispatch({ type: 'remove', id: b0 });
+    expect(sim.world.coins).toBe(before + STRUCTURES.belt.cost);
     expect(sim.world.basket.daisy).toBe(1);
     expect(sim.at(2, 2)).toBeNull();
     const [b] = belts(sim, [5, 5], [5, 5], E);
@@ -444,9 +478,9 @@ describe('save and load', () => {
     belts(sim, [1, 0], [3, 0], E);
     place(sim, 'bundling_table', 4, 0, E);
     belts(sim, [5, 0], [5, 0], E);
-    place(sim, 'packing_station', 6, 0);
+    placePacking(sim, 6, 0);
     run(sim, 137);
-    const json = serialize(sim, DEFAULT_UI_STATE);
+    const json = serialize(sim, DEFAULT_SETTINGS, 0);
     const loaded = deserialize(json);
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) return;
@@ -460,32 +494,61 @@ describe('save and load', () => {
 
   it('restores a completed (sandbox) save', () => {
     const sim = rich();
-    sim.world.orderIndex = ORDERS.length;
-    sim.world.completedOrders = ORDERS.map((o) => o.id);
-    const loaded = deserialize(serialize(sim, { ...DEFAULT_UI_STATE, seenCompletion: true }));
+    sim.world.orders = { activeId: null, offeredIds: [], completedIds: ORDERS.map((o) => o.id), progress: { orderId: null, delivered: {} } };
+    const loaded = deserialize(serialize(sim, { ...DEFAULT_SETTINGS, seenCompletion: true, sound: false }, 0));
     expect(loaded.ok && isSandbox(loaded.sim.world)).toBe(true);
     expect(loaded.ok && loaded.sim.isUnlocked('arrangement_table')).toBe(true);
-    expect(loaded.ok && loaded.ui.seenCompletion).toBe(true);
+    expect(loaded.ok && loaded.settings.seenCompletion).toBe(true);
+    expect(loaded.ok && loaded.settings.sound).toBe(false);
   });
 
   it('survives corrupted saves', () => {
     expect(deserialize('').ok).toBe(false);
     expect(deserialize('{not json').ok).toBe(false);
     expect(deserialize('42').ok).toBe(false);
-    expect(deserialize('{"version":99,"world":{}}').ok).toBe(false);
+    expect(deserialize('{"schemaVersion":99,"world":{}}').ok).toBe(false);
     const sim = rich();
-    place(sim, 'daisy_bed', 0, 0, E);
-    const raw = JSON.parse(serialize(sim, DEFAULT_UI_STATE));
-    // Duplicate the structure on the same tile and add a bogus item kind.
-    raw.world.structures[999] = { ...raw.world.structures[1], id: 999 };
-    raw.world.structures[2] = { id: 2, kind: 'belt', x: 1, y: 0, facing: 1, belt: { item: { id: 5, kind: 'rose' }, progress: 0, from: 3 } };
+    const bed = place(sim, 'daisy_bed', 0, 0, E);
+    const raw = JSON.parse(serialize(sim, DEFAULT_SETTINGS, 0));
+    // Duplicate the bed on the same tile, add a bogus item kind, break coins, drop the packing station.
+    raw.world.structures[999] = { ...raw.world.structures[bed], id: 999 };
+    raw.world.structures[77] = { id: 77, kind: 'belt', x: 1, y: 0, facing: 1, belt: { item: { id: 5, kind: 'rose' }, progress: 0, from: 3 } };
     raw.world.coins = 'lots';
+    delete raw.world.structures[packingId(sim)];
     const loaded = deserialize(JSON.stringify(raw));
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) return;
-    expect(Object.keys(loaded.sim.world.structures)).toHaveLength(2);
-    expect(loaded.sim.world.structures[2].belt!.item).toBeNull();
+    const kinds = Object.values(loaded.sim.world.structures).map((x) => x.kind).sort();
+    expect(kinds).toEqual(['belt', 'daisy_bed', 'packing_station']);
+    expect(loaded.sim.world.structures[77].belt!.item).toBeNull();
     expect(typeof loaded.sim.world.coins).toBe('number');
+  });
+
+  it('migrates a version 1 save to the current schema', () => {
+    const v1 = {
+      version: 1,
+      savedAt: 1,
+      world: {
+        tick: 10, width: 16, height: 12, expanded: false,
+        structures: { 1: { id: 1, kind: 'daisy_bed', x: 2, y: 2, facing: 1, producer: { growTicks: 5, output: null, blocked: false } } },
+        nextStructureId: 2, nextItemId: 1, coins: 33, stock: {}, basket: { daisy: 1 },
+        orderIndex: 1, orderProgress: { daisy_bundle: 1 }, completedOrders: ['o1_daisies'],
+        unlocked: ['belt', 'daisy_bed', 'packing_station', 'bundling_table'], expansionUnlocked: false,
+        stats: { delivered: 2, crafted: 0, coinsEarned: 30 },
+      },
+      ui: { soundOn: false, musicOn: true, reducedMotion: 'on', tutorialStep: 0, tutorialDismissed: true, speed: 2, seenCompletion: false },
+    };
+    const loaded = deserialize(JSON.stringify(v1));
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.sim.world.orders.activeId).toBe('order2');
+    expect(loaded.sim.world.orders.progress.delivered.daisy_bundle).toBe(1);
+    expect(loaded.sim.world.unlockedPlotIds).toEqual(['potting']);
+    expect(loaded.sim.world.cols).toBe(16);
+    expect(loaded.sim.world.basket.daisy).toBe(1);
+    expect(loaded.settings).toMatchObject({ sound: false, music: true, reducedMotion: true, tutorialDismissed: true, speed: 2 });
+    expect(Object.values(loaded.sim.world.structures).some((x) => x.kind === 'packing_station')).toBe(true);
+    expect(JSON.parse(serialize(loaded.sim, loaded.settings, 0)).schemaVersion).toBe(SCHEMA_VERSION);
   });
 
   it('simulation is tick-based, not time-based', () => {
@@ -496,7 +559,7 @@ describe('save and load', () => {
       belts(s, [1, 0], [2, 0], E);
       place(s, 'bundling_table', 3, 0, E);
       belts(s, [4, 0], [4, 0], E);
-      place(s, 'packing_station', 5, 0);
+      placePacking(s, 5, 0);
       return s;
     };
     const a = build();
@@ -504,6 +567,72 @@ describe('save and load', () => {
     run(a, 500);
     for (let i = 0; i < 500; i += 7) run(b, Math.min(7, 500 - i));
     expect(JSON.stringify(a.world)).toBe(JSON.stringify(b.world));
+  });
+});
+
+describe('ports and typed slots', () => {
+  it('beds have no input, packing accepts from every side, belts refuse head-on', () => {
+    const sim = rich();
+    const bed = place(sim, 'daisy_bed', 5, 5, E);
+    const [feeder] = belts(sim, [4, 5], [4, 5], E);
+    sim.world.structures[feeder].belt!.item = { id: 1, kind: 'daisy' };
+    sim.world.nextItemId = 2;
+    run(sim, BELT_TICKS + 2);
+    expect(sim.world.structures[feeder].belt!.item).toBeTruthy();
+    expect(sim.world.structures[feeder].belt!.block).toBe('dead_end');
+    expect(sim.world.structures[bed].producer!.output).toBeNull();
+
+    const pk = placePacking(sim, 9, 9);
+    for (const [x, y, f] of [[8, 9, E], [10, 9, W], [9, 8, S], [9, 10, N]] as Array<[number, number, Dir]>) {
+      const [b] = belts(sim, [x, y], [x, y], f);
+      sim.world.structures[b].belt!.item = { id: sim.world.nextItemId++, kind: 'daisy' };
+    }
+    const before = sim.world.structures[pk].packing!.received;
+    run(sim, BELT_TICKS + 1);
+    expect(sim.world.structures[pk].packing!.received).toBe(before + 4);
+  });
+
+  it('arrangement table never deadlocks: a flood of bundles leaves room for the sachet', () => {
+    const sim = rich();
+    const t = place(sim, 'arrangement_table', 5, 5, S);
+    belts(sim, [5, 6], [5, 6], S);
+    const m = sim.world.structures[t].processor!;
+    for (let i = 0; i < 40; i++) m.inputs.push({ id: 100 + i, kind: 'daisy_bundle' });
+    // Sanity: the sim would never let that happen; refusalReason caps per ingredient.
+    const [wb] = belts(sim, [4, 5], [4, 5], E);
+    sim.world.structures[wb].belt!.item = { id: 1, kind: 'daisy_bundle' };
+    sim.world.nextItemId = 500;
+    run(sim, BELT_TICKS + 1);
+    expect(sim.world.structures[wb].belt!.block).toBe('buffer_full');
+    const [nb] = belts(sim, [5, 4], [5, 4], S);
+    sim.world.structures[nb].belt!.item = { id: 2, kind: 'lavender_sachet' };
+    run(sim, BELT_TICKS + 1);
+    expect(sim.world.structures[nb].belt!.item).toBeNull(); // sachet accepted despite the bundle pile
+    expect(m.workTicks).not.toBeNull();
+  });
+
+  it('tick order: a craft finished on tick T leaves on tick T when the output tile is free', () => {
+    const sim = rich();
+    const t = place(sim, 'bundling_table', 0, 0, E);
+    const [out] = belts(sim, [1, 0], [1, 0], E);
+    const m = sim.world.structures[t].processor!;
+    m.inputs.push({ id: 1, kind: 'daisy' }, { id: 2, kind: 'daisy' });
+    sim.world.nextItemId = 3;
+    run(sim, 1); // starts crafting
+    run(sim, RECIPES.daisy_bundle.durationTicks - 1);
+    expect(sim.world.structures[out].belt!.item).toBeNull();
+    const events = run(sim, 1);
+    expect(events.map((e) => e.type)).toEqual(expect.arrayContaining(['crafted', 'item_moved']));
+    expect(sim.world.structures[out].belt!.item?.kind).toBe('daisy_bundle');
+  });
+
+  it('a bed blocked for a while raises exactly one blocked event per reason', () => {
+    const sim = rich();
+    place(sim, 'daisy_bed', 0, 0, E); // faces grass
+    const events = run(sim, 200);
+    const blocked = events.filter((e) => e.type === 'blocked');
+    expect(blocked).toHaveLength(1);
+    expect(blocked[0]).toMatchObject({ reason: 'dead_end' });
   });
 });
 
@@ -517,7 +646,7 @@ describe('item conservation', () => {
     belts(sim, [4, 1], [4, 1], N);
     place(sim, 'bundling_table', 4, 0, E);
     belts(sim, [5, 0], [7, 0], E);
-    place(sim, 'packing_station', 8, 0);
+    placePacking(sim, 8, 0);
     let spawned = 0;
     let crafted = 0;
     let consumedDaisies = 0;

@@ -4,12 +4,14 @@
  * React subscribes via useSyncExternalStore; Phaser reads it directly every frame.
  */
 import { TICK_MS } from '../sim/data/balance';
-import { ORDERS } from '../sim/data/orders';
+import { ITEMS } from '../sim/data/items';
+import { ORDERS, orderById, orderIndex } from '../sim/data/orders';
 import { STRUCTURES } from '../sim/data/structures';
 import { createWorld, Sim } from '../sim/game';
 import { currentOrder, isSandbox } from '../sim/orders';
-import { DEFAULT_UI_STATE, deserialize, localStorageStore, memoryStore, serialize, type SaveStore, type UiSaveState } from '../sim/save';
-import type { Action, ActionResult, Dir, ItemKind, SimEvent, StructureKind } from '../sim/types';
+import { DEFAULT_SETTINGS, deserialize, localStorageStore, memoryStore, serialize, type SaveStore, type Settings } from '../sim/save';
+import type { Action, ActionResult, BlockReason, Dir, ItemKind, SimEvent, Structure, StructureKind } from '../sim/types';
+import { fmt, S } from '../ui/strings';
 import { audio } from './audio';
 
 export type Tool =
@@ -27,16 +29,26 @@ export interface Notice {
 
 export type Screen = 'title' | 'game';
 
+export interface Celebration {
+  orderId: string;
+  reward: number;
+  unlockLine: string | null;
+  final: boolean;
+  until: number;
+}
+
 export interface UiState {
   screen: Screen;
   tool: Tool;
   selectedId: number | null;
   hover: { x: number; y: number } | null;
+  /** Keyboard cursor on the garden (null until the garden is focused and an arrow pressed). */
+  cursor: { x: number; y: number } | null;
   buildFacing: Dir;
   paused: boolean;
   speed: 1 | 2 | 3;
   notices: Notice[];
-  settings: UiSaveState;
+  settings: Settings;
   tutorialOpen: boolean;
   settingsOpen: boolean;
   completionOpen: boolean;
@@ -46,12 +58,35 @@ export interface UiState {
   saveProblem: string | null;
   /** Milliseconds of sim time elapsed; drives sim-synced animation. */
   simTimeMs: number;
-  /** Last pointer position in page pixels, for the floating build hint. */
-  pointer: { x: number; y: number };
+  /** Belt path being laid by drag or by keyboard. */
   dragPath: Array<{ x: number; y: number }> | null;
+  /** True while the keyboard is laying a belt path (Enter started it). */
+  keyPathActive: boolean;
+  celebration: Celebration | null;
+  /** Text for the polite live region describing the cursor tile. */
+  announce: string;
 }
 
 type Listener = () => void;
+
+export function blockText(reason: BlockReason, item?: ItemKind | null, target?: string): string {
+  switch (reason) {
+    case 'queue':
+      return S.blocked.queue;
+    case 'dead_end':
+      return target === 'belt' ? S.blocked.beltEnd : S.blocked.noExit;
+    case 'head_on':
+      return S.blocked.headOn;
+    case 'wrong_item':
+      return fmt(S.blocked.wrongItem, { target: target ?? 'That machine', item: item ? ITEMS[item].name : 'that' });
+    case 'buffer_full':
+      return S.blocked.inputFull;
+    case 'stock_full':
+      return fmt(S.blocked.stockFull, { item: item ? ITEMS[item].plural : 'those' });
+    default:
+      return '';
+  }
+}
 
 export class GameStore {
   sim: Sim;
@@ -68,21 +103,24 @@ export class GameStore {
   private lastAutosave = 0;
   private noticeId = 1;
   private storage: SaveStore;
+  private announceTimer: number | null = null;
 
   constructor(storage?: SaveStore) {
     this.storage = storage ?? (typeof localStorage !== 'undefined' ? localStorageStore() : memoryStore());
     this.sim = new Sim(createWorld());
     const existing = this.storage.get();
+    const prefersReduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.ui = {
       screen: 'title',
       tool: { type: 'select' },
       selectedId: null,
       hover: null,
+      cursor: null,
       buildFacing: 1,
       paused: false,
       speed: 1,
       notices: [],
-      settings: { ...DEFAULT_UI_STATE },
+      settings: { ...DEFAULT_SETTINGS, reducedMotion: prefersReduced },
       tutorialOpen: true,
       settingsOpen: false,
       completionOpen: false,
@@ -90,9 +128,17 @@ export class GameStore {
       hasSave: !!existing,
       saveProblem: null,
       simTimeMs: 0,
-      pointer: { x: 0, y: 0 },
       dragPath: null,
+      keyPathActive: false,
+      celebration: null,
+      announce: '',
     };
+    // A saved mute survives even on the title screen so the first click honors it.
+    const peek = deserialize(existing);
+    if (peek.ok) {
+      this.ui.settings = peek.settings;
+    }
+    this.applyAudioSettings();
   }
 
   // ---- subscription -------------------------------------------------------------
@@ -113,24 +159,39 @@ export class GameStore {
     this.emit();
   }
 
+  private applyAudioSettings(): void {
+    audio.setSound(this.ui.settings.sound);
+    audio.setMusic(this.ui.settings.music);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-reduced-motion', this.ui.settings.reducedMotion ? 'true' : 'false');
+    }
+  }
+
   // ---- lifecycle ------------------------------------------------------------------
   newGame(): void {
     this.sim = new Sim(createWorld());
+    const keep = this.ui.settings;
     this.ui = {
       ...this.ui,
       screen: 'game',
       tool: { type: 'select' },
       selectedId: null,
+      cursor: null,
       paused: false,
       speed: 1,
-      settings: { ...DEFAULT_UI_STATE, soundOn: this.ui.settings.soundOn, musicOn: this.ui.settings.musicOn, reducedMotion: this.ui.settings.reducedMotion },
+      settings: { ...DEFAULT_SETTINGS, sound: keep.sound, music: keep.music, reducedMotion: keep.reducedMotion },
       tutorialOpen: true,
       completionOpen: false,
+      settingsOpen: false,
       notices: [],
       simTimeMs: 0,
       saveProblem: null,
+      celebration: null,
+      dragPath: null,
+      keyPathActive: false,
     };
     this.acc = 0;
+    this.applyAudioSettings();
     this.save();
     this.start();
     this.emit();
@@ -139,7 +200,8 @@ export class GameStore {
   continueGame(): boolean {
     const result = deserialize(this.storage.get());
     if (!result.ok) {
-      this.setUi({ saveProblem: `Your saved garden could not be read (${result.reason}).`, hasSave: false });
+      this.storage.backup();
+      this.setUi({ saveProblem: S.save.unreadableBody, hasSave: false });
       return false;
     }
     this.sim = result.sim;
@@ -148,18 +210,22 @@ export class GameStore {
       screen: 'game',
       tool: { type: 'select' },
       selectedId: null,
-      settings: result.ui,
-      speed: result.ui.speed as 1 | 2 | 3,
+      cursor: null,
+      settings: result.settings,
+      speed: result.settings.speed as 1 | 2 | 3,
       paused: false,
-      tutorialOpen: !result.ui.tutorialDismissed,
+      tutorialOpen: !result.settings.tutorialDismissed,
       completionOpen: false,
+      settingsOpen: false,
       notices: [],
       simTimeMs: 0,
       saveProblem: null,
+      celebration: null,
+      dragPath: null,
+      keyPathActive: false,
     };
-    audio.setSound(result.ui.soundOn);
-    audio.setMusic(result.ui.musicOn);
     this.acc = 0;
+    this.applyAudioSettings();
     this.start();
     this.emit();
     return true;
@@ -170,6 +236,7 @@ export class GameStore {
     this.lastFrame = performance.now();
     const frame = (now: number) => {
       this.raf = requestAnimationFrame(frame);
+      // A hidden tab stops animation frames; when it returns we do not catch up (max 250 ms).
       const dt = Math.min(250, now - this.lastFrame);
       this.lastFrame = now;
       this.advance(dt);
@@ -182,11 +249,22 @@ export class GameStore {
     this.raf = null;
   }
 
+  /** The sim is held while paused, while a dialog covers the garden, and during the celebration beat. */
+  get held(): boolean {
+    return this.ui.paused || this.ui.settingsOpen || this.ui.completionOpen || this.ui.celebration !== null;
+  }
+
   /** Advance real time; runs whole fixed ticks and leaves the remainder for interpolation. */
   advance(dtMs: number): void {
     if (this.ui.screen !== 'game') return;
-    const blocked = this.ui.paused || this.ui.settingsOpen || this.ui.completionOpen;
-    if (!blocked) {
+    const now = performance.now();
+    if (this.ui.celebration && now >= this.ui.celebration.until) {
+      this.ui = { ...this.ui, celebration: null };
+      this.emit();
+    }
+    const held = this.held;
+    audio.setPaused(held);
+    if (!held) {
       this.acc += dtMs * this.ui.speed;
       let ticked = false;
       let guard = 0;
@@ -198,54 +276,89 @@ export class GameStore {
       }
       this.alpha = this.acc / TICK_MS;
       this.ui.simTimeMs = this.sim.world.tick * TICK_MS + this.acc;
-      if (ticked) this.emit();
+      if (ticked) {
+        this.updateLoops();
+        this.emit();
+      }
     }
     this.pruneNotices();
-    if (performance.now() - this.lastAutosave > 10_000) this.save();
+    if (now - this.lastAutosave > 10_000) this.save();
   }
 
-  /** Run the sim forward by N ticks instantly (used by tests and the e2e harness). */
+  private updateLoops(): void {
+    let working = false;
+    let riding = false;
+    for (const s of Object.values(this.sim.world.structures)) {
+      if (s.processor?.workTicks !== null && s.processor !== undefined) working = true;
+      if (s.belt?.item) riding = true;
+      if (working && riding) break;
+    }
+    audio.setLoop('machine_working', working);
+    audio.setLoop('belt_tick', riding);
+  }
+
+  /** Run the sim forward by N ticks instantly (used by the e2e harness). */
   fastForward(ticks: number): void {
     for (let i = 0; i < ticks; i++) this.handleEvents(this.sim.step());
+    this.ui.simTimeMs = this.sim.world.tick * TICK_MS;
     this.emit();
   }
 
   private handleEvents(events: SimEvent[]): void {
+    let delivered = false;
     for (const e of events) {
       this.pendingEvents.push(e);
       switch (e.type) {
         case 'order_complete': {
-          const order = ORDERS.find((o) => o.id === e.orderId);
-          this.notify(`Order complete: ${order?.title ?? ''}. +${e.reward} coins!`, 'good', 5000);
-          audio.play('order_complete');
-          this.save();
-          break;
-        }
-        case 'unlocked': {
-          const names = e.kinds.map((k) => STRUCTURES[k].name);
-          if (e.expansion) names.push('Garden expansion');
-          if (names.length && this.sim.world.orderIndex > 0) {
-            this.notify(`Unlocked: ${names.join(', ')}`, 'good', 6000);
-            audio.play('unlock');
+          const order = orderById(e.orderId);
+          const next = ORDERS[orderIndex(e.orderId) + 1];
+          const names: string[] = [];
+          if (next) {
+            for (const k of next.unlocks) names.push(STRUCTURES[k].name);
+            if (next.unlocksExpansion) names.push(S.celebration.expansionName);
           }
+          const unlockLine = names.length ? fmt(S.celebration.unlockLine, { names: names.join(', ') }) : null;
+          this.ui = {
+            ...this.ui,
+            celebration: e.final
+              ? null
+              : { orderId: e.orderId, reward: e.reward, unlockLine, final: e.final, until: performance.now() + 3200 },
+          };
+          this.notify(fmt(S.celebration.complete, { customer: order?.customer ?? '' }) + ' ' + fmt(S.celebration.earned, { coins: e.reward }), 'good', 5000);
+          if (unlockLine) this.notify(unlockLine, 'good', 6000);
+          audio.play(e.final ? 'final_celebration' : 'order_complete');
+          if (unlockLine) audio.play('unlock', { delay: 1.2 });
+          this.save();
           break;
         }
         case 'all_orders_complete':
           if (!this.ui.settings.seenCompletion) {
-            this.ui.completionOpen = true;
-            this.ui.settings = { ...this.ui.settings, seenCompletion: true };
+            this.ui = { ...this.ui, completionOpen: true, settings: { ...this.ui.settings, seenCompletion: true } };
           }
           break;
         case 'crafted':
-          audio.play('pop');
+          audio.play('item_pop', { throttleMs: 120 });
+          break;
+        case 'item_spawned':
+          audio.play('flower_bloom', { throttleMs: 400 });
           break;
         case 'delivered':
-          audio.play('deliver');
+          delivered = true;
           break;
+        case 'blocked': {
+          const s = this.sim.world.structures[e.structureId];
+          if (s) {
+            const held = s.producer?.output?.kind ?? s.processor?.outputs[0]?.kind ?? null;
+            this.notify(fmt(S.blocked.noticeBed, { name: STRUCTURES[s.kind].name, why: blockText(e.reason, held).replace(/^Blocked: /, '') }), 'bad', 4500);
+            audio.play('blocked', { throttleMs: 500 });
+          }
+          break;
+        }
         default:
           break;
       }
     }
+    if (delivered) audio.play('deliver', { throttleMs: 150 });
     if (this.pendingEvents.length > 500) this.pendingEvents.splice(0, this.pendingEvents.length - 500);
   }
 
@@ -264,30 +377,31 @@ export class GameStore {
       switch (action.type) {
         case 'place':
         case 'place_belt_path':
-          audio.play('place');
+          audio.play('build_place');
           break;
         case 'rotate':
-          audio.play('rotate');
+          audio.play('build_rotate');
           break;
         case 'remove':
-          audio.play('remove');
+          audio.play('build_remove');
+          if (result.refund) audio.play('coins', { delay: 0.15 });
           if (this.ui.selectedId === action.id) this.ui.selectedId = null;
           break;
         case 'undo':
-          audio.play('remove');
+          audio.play('undo');
           if (this.ui.selectedId !== null && !this.sim.world.structures[this.ui.selectedId]) this.ui.selectedId = null;
           break;
         case 'expand':
           audio.play('unlock');
-          this.notify('The garden is bigger now. More room to build!', 'good');
           break;
-        default:
+        case 'basket_drop':
+          audio.play('build_place');
           break;
       }
-      if (result.message) this.notify(result.message, 'info');
+      if (result.message) this.notify(result.message, action.type === 'expand' ? 'good' : 'info');
       this.save();
     } else {
-      audio.play('invalid');
+      audio.play('ui_error');
       if (result.message) this.notify(result.message, 'bad');
     }
     this.emit();
@@ -296,7 +410,6 @@ export class GameStore {
 
   notify(text: string, tone: Notice['tone'] = 'info', ms = 3200): void {
     const now = performance.now();
-    // Collapse duplicates so a held key does not spam.
     const notices = this.ui.notices.filter((n) => n.text !== text);
     notices.push({ id: this.noticeId++, text, tone, until: now + ms });
     this.ui = { ...this.ui, notices: notices.slice(-4) };
@@ -313,32 +426,48 @@ export class GameStore {
 
   // ---- ui helpers -------------------------------------------------------------------
   setTool(tool: Tool): void {
-    this.setUi({ tool, selectedId: tool.type === 'select' ? this.ui.selectedId : null, dragPath: null });
+    audio.play('ui_click');
+    this.setUi({ tool, selectedId: tool.type === 'select' ? this.ui.selectedId : null, dragPath: null, keyPathActive: false });
   }
 
   select(id: number | null): void {
     this.setUi({ selectedId: id, tool: { type: 'select' } });
   }
 
-  rotateBuildFacing(): void {
-    this.setUi({ buildFacing: ((this.ui.buildFacing + 1) % 4) as Dir });
-    audio.play('rotate');
+  rotateBuildFacing(ccw = false): void {
+    this.setUi({ buildFacing: ((this.ui.buildFacing + (ccw ? 3 : 1)) % 4) as Dir });
+    audio.play('build_rotate');
+  }
+
+  /** R: rotate the ghost while building, else the selected structure. */
+  rotate(ccw = false): void {
+    if (this.ui.tool.type === 'build') this.rotateBuildFacing(ccw);
+    else if (this.ui.selectedId !== null) {
+      const s = this.sim.world.structures[this.ui.selectedId];
+      if (s) this.dispatch({ type: 'rotate', id: s.id, facing: ((s.facing + (ccw ? 3 : 1)) % 4) as Dir });
+    } else this.rotateBuildFacing(ccw);
   }
 
   togglePause(): void {
+    audio.play('ui_click');
     this.setUi({ paused: !this.ui.paused });
   }
 
   setSpeed(speed: 1 | 2 | 3): void {
+    audio.play('ui_click');
     this.ui.settings = { ...this.ui.settings, speed };
     this.setUi({ speed, paused: false });
   }
 
-  updateSettings(patch: Partial<UiSaveState>): void {
+  cycleSpeed(): void {
+    this.setSpeed((this.ui.speed === 3 ? 1 : this.ui.speed + 1) as 1 | 2 | 3);
+  }
+
+  updateSettings(patch: Partial<Settings>): void {
     const settings = { ...this.ui.settings, ...patch };
-    audio.setSound(settings.soundOn);
-    audio.setMusic(settings.musicOn);
-    this.setUi({ settings });
+    this.ui = { ...this.ui, settings };
+    this.applyAudioSettings();
+    this.emit();
     this.save();
   }
 
@@ -347,21 +476,101 @@ export class GameStore {
     this.setUi({ tutorialOpen: false });
   }
 
-  setTutorialStep(step: number): void {
-    this.updateSettings({ tutorialStep: step });
+  /** Cancel the current thing: dialog, then path, then tool, then selection. Returns true if something changed. */
+  cancel(): boolean {
+    if (this.ui.settingsOpen) {
+      this.setUi({ settingsOpen: false });
+      return true;
+    }
+    if (this.ui.dragPath || this.ui.keyPathActive) {
+      this.setUi({ dragPath: null, keyPathActive: false });
+      return true;
+    }
+    if (this.ui.tool.type !== 'select') {
+      this.setTool({ type: 'select' });
+      return true;
+    }
+    if (this.ui.selectedId !== null) {
+      this.select(null);
+      return true;
+    }
+    return false;
   }
 
-  reducedMotion(): boolean {
-    const s = this.ui.settings.reducedMotion;
-    if (s === 'on') return true;
-    if (s === 'off') return false;
-    return typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // ---- keyboard cursor ----------------------------------------------------------------
+  moveCursor(dx: number, dy: number): void {
+    const w = this.sim.world;
+    const c = this.ui.cursor ?? this.ui.hover ?? { x: Math.floor(w.cols / 2), y: Math.floor(w.rows / 2) };
+    const nx = Math.max(0, Math.min(w.cols - 1, c.x + dx));
+    const ny = Math.max(0, Math.min(w.rows - 1, c.y + dy));
+    const cursor = { x: nx, y: ny };
+    let dragPath = this.ui.dragPath;
+    if (this.ui.keyPathActive && dragPath) {
+      const idx = dragPath.findIndex((t) => t.x === nx && t.y === ny);
+      dragPath = idx >= 0 ? dragPath.slice(0, idx + 1) : [...dragPath, cursor];
+    }
+    this.setUi({ cursor, dragPath });
+    this.scheduleAnnounce();
+  }
+
+  private scheduleAnnounce(): void {
+    if (this.announceTimer !== null) clearTimeout(this.announceTimer);
+    this.announceTimer = window.setTimeout(() => {
+      this.announceTimer = null;
+      const c = this.ui.cursor;
+      if (!c) return;
+      const s = this.sim.at(c.x, c.y);
+      const what = s ? describeStructure(s) : S.a11y.emptyTile;
+      this.setUi({ announce: fmt(S.a11y.cursorTile, { what, x: c.x + 1, y: c.y + 1 }) });
+    }, 400);
+  }
+
+  /** Enter / Space on the garden. */
+  activateCursor(): void {
+    const c = this.ui.cursor;
+    if (!c) {
+      this.moveCursor(0, 0);
+      return;
+    }
+    const tool = this.ui.tool;
+    switch (tool.type) {
+      case 'build':
+        if (tool.kind === 'belt') {
+          if (!this.ui.keyPathActive) {
+            this.setUi({ keyPathActive: true, dragPath: [c] });
+          } else {
+            const path = this.ui.dragPath ?? [c];
+            this.setUi({ keyPathActive: false, dragPath: null });
+            if (path.length === 1) this.dispatch({ type: 'place', kind: 'belt', x: path[0].x, y: path[0].y, facing: this.ui.buildFacing });
+            else this.dispatch({ type: 'place_belt_path', tiles: path });
+          }
+        } else {
+          this.dispatch({ type: 'place', kind: tool.kind, x: c.x, y: c.y, facing: this.ui.buildFacing });
+        }
+        break;
+      case 'remove': {
+        const s = this.sim.at(c.x, c.y);
+        if (s) this.dispatch({ type: 'remove', id: s.id });
+        else this.notify(S.palette.nothingHere, 'bad');
+        break;
+      }
+      case 'basket': {
+        const r = this.dispatch({ type: 'basket_drop', kind: tool.kind, x: c.x, y: c.y });
+        if (r.ok && !(this.sim.world.basket[tool.kind] ?? 0)) this.setTool({ type: 'select' });
+        break;
+      }
+      case 'select': {
+        const s = this.sim.at(c.x, c.y);
+        this.select(s ? s.id : null);
+        break;
+      }
+    }
   }
 
   // ---- persistence -----------------------------------------------------------------
   save(): void {
     if (this.ui.screen !== 'game') return;
-    this.storage.set(serialize(this.sim, this.ui.settings));
+    this.storage.set(serialize(this.sim, this.ui.settings, Date.now()));
     this.lastAutosave = performance.now();
     if (!this.ui.hasSave) this.setUi({ hasSave: true });
   }
@@ -379,6 +588,21 @@ export class GameStore {
   get sandbox(): boolean {
     return isSandbox(this.sim.world);
   }
+
+  get reducedMotion(): boolean {
+    return this.ui.settings.reducedMotion;
+  }
+}
+
+export function describeStructure(s: Structure): string {
+  const def = STRUCTURES[s.kind];
+  let state = '';
+  if (s.belt) state = s.belt.item ? fmt(S.states.carrying, { item: ITEMS[s.belt.item.kind].name }) : S.states.empty;
+  else if (s.producer) state = s.producer.blockedTicks > 0 ? S.states.blocked : s.producer.output ? S.states.ready : S.states.growing;
+  else if (s.processor) state = s.processor.blockedTicks > 0 ? S.states.blocked : s.processor.workTicks !== null ? S.states.processing : s.processor.outputs.length ? S.states.ready : S.states.waiting;
+  else state = S.states.packingWaiting;
+  const facing = def.hasFacing ? ', ' + fmt(S.states.faces, { facing: S.facing[s.facing] }) : '';
+  return `${def.name}, ${state}${facing}`;
 }
 
 export const store = new GameStore();

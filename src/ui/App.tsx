@@ -14,6 +14,10 @@ import { SettingsModal } from './SettingsModal';
 import { CompletionModal } from './CompletionModal';
 import { TitleScreen } from './TitleScreen';
 import { BuildHint } from './BuildHint';
+import { CelebrationCard } from './CelebrationCard';
+import { S } from './strings';
+
+const GARDEN_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' ', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D']);
 
 export function App() {
   useStoreVersion();
@@ -42,49 +46,94 @@ export function App() {
       if (store.ui.screen !== 'game') return;
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
-      if (store.ui.settingsOpen || store.ui.completionOpen) {
-        if (e.key === 'Escape') store.setUi({ settingsOpen: false });
+      // Dialogs own their keys (focus trap + Esc).
+      if (store.ui.settingsOpen || store.ui.completionOpen) return;
+      // Leave browser shortcuts alone: only Ctrl/Cmd+Z is ours.
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          store.dispatch({ type: 'undo' });
+        }
         return;
       }
-      const key = e.key.toLowerCase();
-      switch (key) {
-        case 'r': {
-          if (store.ui.tool.type === 'build') store.rotateBuildFacing();
-          else if (store.ui.selectedId !== null) store.dispatch({ type: 'rotate', id: store.ui.selectedId });
-          else store.rotateBuildFacing();
-          break;
-        }
-        case 'escape':
-          if (store.ui.tool.type !== 'select') store.setTool({ type: 'select' });
-          else if (store.ui.selectedId !== null) store.select(null);
-          break;
-        case 'z':
-          if (!e.metaKey || e.ctrlKey || true) store.dispatch({ type: 'undo' });
-          break;
-        case 'delete':
-        case 'backspace':
-          if (store.ui.selectedId !== null) store.dispatch({ type: 'remove', id: store.ui.selectedId });
-          break;
+      if (e.altKey) return;
+      const inHud = !!target && !!target.closest('.hud');
+      const gardenFocused = !inHud;
+      if (GARDEN_KEYS.has(e.key) && !gardenFocused) return; // let buttons use Enter/Space/arrows
+      switch (e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          e.preventDefault();
+          store.moveCursor(0, -1);
+          return;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          e.preventDefault();
+          store.moveCursor(0, 1);
+          return;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          e.preventDefault();
+          store.moveCursor(-1, 0);
+          return;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          e.preventDefault();
+          store.moveCursor(1, 0);
+          return;
+        case 'Enter':
         case ' ':
           e.preventDefault();
-          store.togglePause();
+          store.activateCursor();
+          return;
+        case 'Escape':
+          store.cancel();
+          return;
+        case 'Home':
+          e.preventDefault();
+          sceneRef.current?.recenter();
+          return;
+        case '=':
+        case '+':
+          sceneRef.current?.zoomBy(1.2);
+          return;
+        case '-':
+        case '_':
+          sceneRef.current?.zoomBy(1 / 1.2);
+          return;
+        case 'Delete':
+          if (store.ui.selectedId !== null) store.dispatch({ type: 'remove', id: store.ui.selectedId });
+          return;
+        default:
           break;
-        case '1':
-        case '2':
-        case '3':
-          store.setSpeed(Number(key) as 1 | 2 | 3);
+      }
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          store.rotate(e.shiftKey);
           break;
-        case 'b':
-          store.setTool({ type: 'build', kind: 'belt' });
+        case 'z':
+          store.dispatch({ type: 'undo' });
           break;
         case 'x':
           store.setTool(store.ui.tool.type === 'remove' ? { type: 'select' } : { type: 'remove' });
           break;
-        case 'h':
-          store.setUi({ tutorialOpen: !store.ui.tutorialOpen });
+        case 'b':
+          store.setUi({ paletteOpen: !store.ui.paletteOpen });
+          if (!store.ui.paletteOpen) return;
+          requestAnimationFrame(() => document.querySelector<HTMLElement>('.palette .ptool')?.focus());
+          break;
+        case 'p':
+          store.togglePause();
           break;
         case 'f':
-          sceneRef.current?.recenter();
+          store.cycleSpeed();
+          break;
+        case 'h':
+          store.setUi({ tutorialOpen: !store.ui.tutorialOpen });
           break;
         default:
           return;
@@ -101,17 +150,32 @@ export function App() {
     };
   }, []);
 
-  const reduced = store.reducedMotion();
-
   return (
-    <div className={'app' + (reduced ? ' reduced' : '')} onPointerDown={() => audio.unlock()}>
-      <div className="world" ref={worldRef} aria-label="Garden" />
+    <div className="app" onPointerDown={() => audio.unlock()}>
+      <div
+        className="world"
+        ref={worldRef}
+        role="application"
+        aria-label={S.a11y.game}
+        aria-describedby="garden-help"
+        tabIndex={ui.screen === 'game' ? 0 : -1}
+      />
+      <span id="garden-help" className="sr-only">
+        {S.a11y.gameHelp}
+      </span>
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {ui.announce}
+      </div>
       {ui.screen === 'title' && <TitleScreen ready={sceneReady} />}
       {ui.screen === 'game' && (
         <div className="hud">
+          <a className="skip-link" href="#" onClick={(e) => { e.preventDefault(); worldRef.current?.focus(); }}>
+            Skip to garden
+          </a>
           <TopBar onRecenter={() => sceneRef.current?.recenter()} onZoom={(f) => sceneRef.current?.zoomBy(f)} />
           <OrderPanel />
           <Notices />
+          {ui.celebration && <CelebrationCard />}
           {ui.tutorialOpen && <Tutorial />}
           <Inspector />
           <Palette />

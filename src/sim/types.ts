@@ -19,6 +19,7 @@ export type StructureKind =
   | 'arrangement_table'
   | 'packing_station';
 
+/** Items are discrete: a stable id and a definition id (`kind`). */
 export interface Item {
   id: number;
   kind: ItemKind;
@@ -28,7 +29,7 @@ export interface Item {
 export type BlockReason =
   | 'none'
   | 'queue' // next belt is simply occupied; normal
-  | 'dead_end' // nothing in front
+  | 'dead_end' // nothing in front, or something with no input on that side
   | 'head_on' // belt in front points back at us
   | 'wrong_item' // machine in front has no recipe for this item
   | 'buffer_full' // machine in front cannot take more of this item
@@ -50,16 +51,23 @@ export interface ProducerState {
   growTicks: number;
   /** A grown flower waiting to be pushed out. */
   output: Item | null;
-  /** True if we tried to push output last tick and failed. */
-  blocked: boolean;
+  /** Consecutive ticks the output has been unable to leave (0 = not blocked). */
+  blockedTicks: number;
+  /** Why the output cannot leave, when blockedTicks > 0. */
+  block: BlockReason;
 }
 
 export interface ProcessorState {
+  /** Recipe this machine is set to. Slice machines have exactly one. */
+  recipeId: string;
+  /** Typed per-ingredient buffers; capped per ingredient so one input can never starve another. */
   inputs: Item[];
+  /** Finished product waiting for the output side to free up (capacity OUTPUT_BUFFER_CAP). */
   outputs: Item[];
   /** Ticks of work done on the current craft; null when not crafting. */
   workTicks: number | null;
-  blocked: boolean;
+  blockedTicks: number;
+  block: BlockReason;
   /** Tick at which an item was last refused (for feedback). */
   lastRefusedTick: number;
   lastRefusedKind: ItemKind | null;
@@ -71,6 +79,7 @@ export interface PackingState {
   received: number;
 }
 
+/** A placed thing. `id` is the stable uid, `kind` the definition id. */
 export interface Structure {
   id: number;
   kind: StructureKind;
@@ -85,12 +94,21 @@ export interface Structure {
 
 export type Counts = Partial<Record<ItemKind, number>>;
 
+/** The order board. The slice pins one slip at a time, but the shape allows more. */
+export interface OrderBoard {
+  /** Active order id, or null once every order is done (sandbox / open market). */
+  activeId: string | null;
+  offeredIds: string[];
+  completedIds: string[];
+  progress: { orderId: string | null; delivered: Counts };
+}
+
 export interface World {
   tick: number;
-  width: number;
-  height: number;
-  /** Width/height the garden will have after the expansion is bought. */
-  expanded: boolean;
+  /** Bounding box of the open plots. Origin (0,0) is the northwest corner and never moves. */
+  cols: number;
+  rows: number;
+  unlockedPlotIds: string[];
   structures: Record<number, Structure>;
   nextStructureId: number;
   nextItemId: number;
@@ -99,12 +117,9 @@ export interface World {
   stock: Counts;
   /** Items recovered from removed structures. Player can drop them back on a belt. */
   basket: Counts;
-  /** Index into the ORDERS list. Equals ORDERS.length when all are done (sandbox). */
-  orderIndex: number;
-  /** Items allocated to the current order so far. */
-  orderProgress: Counts;
-  completedOrders: string[];
-  unlocked: StructureKind[];
+  orders: OrderBoard;
+  /** Unlocked structure definition ids. */
+  unlocked: string[];
   expansionUnlocked: boolean;
   /** Lifetime stats for the completion screen. */
   stats: { delivered: number; crafted: number; coinsEarned: number };
@@ -114,10 +129,17 @@ export interface Recipe {
   id: string;
   inputs: Counts;
   output: ItemKind;
-  ticks: number;
+  /** Integer ticks at TICK_HZ. */
+  durationTicks: number;
 }
 
 export type StructureRole = 'belt' | 'producer' | 'processor' | 'packing';
+
+/** Ports are facing-relative so a rotated machine keeps its behaviour. */
+export interface Port {
+  dir: 'facing' | 'left' | 'right' | 'back' | 'all';
+  role: 'in' | 'out';
+}
 
 export interface StructureDef {
   kind: StructureKind;
@@ -125,19 +147,27 @@ export interface StructureDef {
   /** One-line purpose shown in tooltips. */
   blurb: string;
   cost: number;
+  /** Coins returned on removal. */
+  refund: number;
   role: StructureRole;
+  ports: Port[];
   /** Producer: what grows and how long (ticks). */
   produces?: ItemKind;
   growTicks?: number;
-  /** Processor: recipe id. */
-  recipe?: string;
+  /** Processor: recipes this machine can run (slice machines have one). */
+  recipeIds?: string[];
   /** Does the facing matter for this structure? */
   hasFacing: boolean;
+  /** Can the player build it from the palette? */
+  buildable: boolean;
+  /** Can the player remove it? */
+  removable: boolean;
 }
 
 export interface ItemDef {
   kind: ItemKind;
   name: string;
+  plural: string;
   /** Coins paid per unit in sandbox mode. */
   value: number;
 }
@@ -158,11 +188,17 @@ export interface OrderDef {
   hint: string;
 }
 
+export interface PlotDef {
+  id: string;
+  rect: { x: number; y: number; w: number; h: number };
+  cost: number;
+}
+
 // ---- Actions -------------------------------------------------------------
 
 export type Action =
   | { type: 'place'; kind: StructureKind; x: number; y: number; facing: Dir }
-  | { type: 'place_belt_path'; tiles: Array<{ x: number; y: number }>; }
+  | { type: 'place_belt_path'; tiles: Array<{ x: number; y: number; facing?: Dir }> }
   | { type: 'rotate'; id: number; facing?: Dir }
   | { type: 'remove'; id: number }
   | { type: 'undo' }
@@ -174,7 +210,10 @@ export type ActionError =
   | 'unaffordable'
   | 'occupied'
   | 'out_of_bounds'
+  | 'locked_plot'
   | 'unknown_structure'
+  | 'not_buildable'
+  | 'not_removable'
   | 'nothing_to_undo'
   | 'undo_unsafe'
   | 'not_a_belt'
@@ -191,6 +230,8 @@ export interface ActionResult {
   message?: string;
   /** Ids touched, for selection/feedback. */
   ids?: number[];
+  /** Coins returned by this action (removal). */
+  refund?: number;
 }
 
 // ---- Events --------------------------------------------------------------
@@ -201,11 +242,12 @@ export type SimEvent =
   | { type: 'crafted'; structureId: number; item: Item }
   | { type: 'delivered'; structureId: number; item: Item; sold?: number }
   | { type: 'refused'; structureId: number; fromId: number; kind: ItemKind; reason: BlockReason }
+  | { type: 'blocked'; structureId: number; reason: BlockReason }
   | { type: 'order_progress'; orderId: string }
-  | { type: 'order_complete'; orderId: string; reward: number }
+  | { type: 'order_complete'; orderId: string; reward: number; final: boolean }
   | { type: 'unlocked'; kinds: StructureKind[]; expansion: boolean }
   | { type: 'all_orders_complete' }
   | { type: 'placed'; structureId: number; kind: StructureKind }
-  | { type: 'removed'; structureId: number; kind: StructureKind; recovered: Counts }
+  | { type: 'removed'; structureId: number; kind: StructureKind; recovered: Counts; refund: number }
   | { type: 'rotated'; structureId: number }
   | { type: 'expanded' };

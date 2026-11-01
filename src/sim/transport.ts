@@ -1,43 +1,42 @@
-import { BELT_TICKS, INPUT_BUFFER_MULTIPLIER, STOCK_CAP } from './data/balance';
+import { BELT_TICKS, INPUT_BUFFER_PER_INGREDIENT, STOCK_CAP } from './data/balance';
 import { ITEMS } from './data/items';
 import { RECIPES } from './data/recipes';
 import { STRUCTURES } from './data/structures';
-import { DX, DY, opposite, structureAt, TileIndex } from './grid';
+import { DX, DY, hasInputOn, opposite, outputSides, structureAt, TileIndex } from './grid';
 import { currentOrder, isSandbox } from './orders';
 import type { BlockReason, Dir, Item, ItemKind, SimEvent, Structure, World } from './types';
 
-/** Why a destination would refuse `kind` arriving from side `fromDir` (direction from dest toward source). */
+/**
+ * Why `dest` would refuse `kind` arriving on its side `fromDir` (the direction from
+ * dest toward the source). 'none' means it will accept right now.
+ */
 export function refusalReason(world: World, dest: Structure | null, kind: ItemKind, fromDir: Dir): BlockReason {
   if (!dest) return 'dead_end';
+  if (!hasInputOn(dest, fromDir)) return dest.kind === 'belt' ? 'head_on' : 'dead_end';
   switch (STRUCTURES[dest.kind].role) {
-    case 'belt': {
-      if (dest.facing === fromDir) return 'head_on';
+    case 'belt':
       return dest.belt!.item ? 'queue' : 'none';
-    }
     case 'producer':
       return 'dead_end';
     case 'processor': {
-      const recipe = RECIPES[STRUCTURES[dest.kind].recipe!];
+      const recipe = RECIPES[dest.processor!.recipeId];
       const need = recipe.inputs[kind];
       if (!need) return 'wrong_item';
       const have = dest.processor!.inputs.filter((i) => i.kind === kind).length;
-      return have >= need * INPUT_BUFFER_MULTIPLIER ? 'buffer_full' : 'none';
+      return have >= INPUT_BUFFER_PER_INGREDIENT ? 'buffer_full' : 'none';
     }
     case 'packing': {
       if (isSandbox(world)) return 'none';
       const order = currentOrder(world);
       const needed = order?.requires[kind] ?? 0;
-      const progress = world.orderProgress[kind] ?? 0;
+      const progress = world.orders.progress.delivered[kind] ?? 0;
       if (needed > progress) return 'none';
       return (world.stock[kind] ?? 0) >= STOCK_CAP ? 'stock_full' : 'none';
     }
   }
 }
 
-/**
- * Hand `item` to `dest`, which must have been checked with refusalReason === 'none'.
- * Returns events produced (delivery, allocation). Caller removes the item from its source.
- */
+/** Hand `item` to `dest`, which must have been checked with refusalReason === 'none'. */
 export function acceptItem(world: World, dest: Structure, item: Item, fromDir: Dir, events: SimEvent[]): void {
   switch (STRUCTURES[dest.kind].role) {
     case 'belt':
@@ -56,7 +55,7 @@ export function acceptItem(world: World, dest: Structure, item: Item, fromDir: D
       world.stats.delivered += 1;
       if (isSandbox(world)) {
         // Open market: finished goods sell as they arrive.
-        const value = ITEM_VALUE[item.kind];
+        const value = ITEMS[item.kind].value;
         world.coins += value;
         world.stats.coinsEarned += value;
         events.push({ type: 'delivered', structureId: dest.id, item, sold: value });
@@ -71,27 +70,20 @@ export function acceptItem(world: World, dest: Structure, item: Item, fromDir: D
   }
 }
 
-const ITEM_VALUE: Record<ItemKind, number> = Object.fromEntries(
-  Object.values(ITEMS).map((d) => [d.kind, d.value]),
-) as Record<ItemKind, number>;
-
-/** Try to push an item out of a structure in its facing direction. */
-export function tryPushOut(
-  world: World,
-  index: TileIndex,
-  source: Structure,
-  item: Item,
-  events: SimEvent[],
-): BlockReason {
-  const tx = source.x + DX[source.facing];
-  const ty = source.y + DY[source.facing];
-  const dest = structureAt(world, index, tx, ty);
-  const fromDir = opposite(source.facing);
-  const reason = refusalReason(world, dest, item.kind, fromDir);
-  if (reason !== 'none') return reason;
-  acceptItem(world, dest!, item, fromDir, events);
-  events.push({ type: 'item_moved', item, fromId: source.id, toId: dest!.id });
-  return 'none';
+/** Try to push an item out of a structure through its output port(s). */
+export function tryPushOut(world: World, index: TileIndex, source: Structure, item: Item, events: SimEvent[]): BlockReason {
+  let reason: BlockReason = 'dead_end';
+  for (const side of outputSides(source)) {
+    const dest = structureAt(world, index, source.x + DX[side], source.y + DY[side]);
+    const fromDir = opposite(side);
+    reason = refusalReason(world, dest, item.kind, fromDir);
+    if (reason === 'none') {
+      acceptItem(world, dest!, item, fromDir, events);
+      events.push({ type: 'item_moved', item, fromId: source.id, toId: dest!.id });
+      return 'none';
+    }
+  }
+  return reason;
 }
 
 /** Priority of a source feeding belt `dest` from `fromDir`: behind first, then right, then left. */
@@ -103,8 +95,8 @@ function feedPriority(dest: Structure, fromDir: Dir): number {
 
 /**
  * Advance belt items and resolve transfers. Deterministic: belts are visited in id order,
- * contested destinations pick the highest-priority feeder, and we repeat passes so a
- * tightly packed line flows forward as a unit instead of leaving gaps.
+ * contested destinations pick the highest-priority feeder, and passes repeat so a tightly
+ * packed line flows forward as a unit instead of leaving gaps.
  */
 export function tickBelts(world: World, index: TileIndex, events: SimEvent[]): void {
   const belts: Structure[] = [];
@@ -121,10 +113,9 @@ export function tickBelts(world: World, index: TileIndex, events: SimEvent[]): v
 
   // 2. Transfer, in passes.
   const movedThisTick = new Set<number>();
-  // Final reason for belts whose item could not leave this tick (dest id for feedback).
   const stuck = new Map<number, { reason: BlockReason; destId: number }>();
   for (let pass = 0; pass < 6; pass++) {
-    type Candidate = { source: Structure; dest: Structure | null; fromDir: Dir; priority: number };
+    type Candidate = { source: Structure; dest: Structure; fromDir: Dir; priority: number };
     const byDest = new Map<number, Candidate[]>();
     stuck.clear();
     for (const b of belts) {
@@ -136,14 +127,8 @@ export function tickBelts(world: World, index: TileIndex, events: SimEvent[]): v
         stuck.set(b.id, { reason: 'dead_end', destId: b.id });
         continue;
       }
-      const cand: Candidate = {
-        source: b,
-        dest,
-        fromDir,
-        priority: dest.kind === 'belt' ? feedPriority(dest, fromDir) : fromDir,
-      };
       const list = byDest.get(dest.id) ?? [];
-      list.push(cand);
+      list.push({ source: b, dest, fromDir, priority: dest.kind === 'belt' ? feedPriority(dest, fromDir) : fromDir });
       byDest.set(dest.id, list);
     }
     let moved = false;
@@ -159,27 +144,23 @@ export function tickBelts(world: World, index: TileIndex, events: SimEvent[]): v
           st.progress = 0;
           st.block = 'none';
           st.stuckTicks = 0;
-          acceptItem(world, c.dest!, item, c.fromDir, events);
+          acceptItem(world, c.dest, item, c.fromDir, events);
           movedThisTick.add(item.id);
-          events.push({ type: 'item_moved', item, fromId: c.source.id, toId: c.dest!.id });
+          events.push({ type: 'item_moved', item, fromId: c.source.id, toId: c.dest.id });
           moved = true;
         } else {
-          stuck.set(c.source.id, { reason, destId: c.dest!.id });
+          stuck.set(c.source.id, { reason, destId: c.dest.id });
         }
       }
     }
     if (!moved) break;
   }
   for (const [beltId, info] of stuck) {
-    markStuck(world.structures[beltId], info.reason, events, info.destId);
-  }
-}
-
-function markStuck(belt: Structure, reason: BlockReason, events: SimEvent[], destId: number): void {
-  const st = belt.belt!;
-  st.block = reason;
-  st.stuckTicks += 1;
-  if (st.stuckTicks === 1 && reason !== 'queue' && reason !== 'none') {
-    events.push({ type: 'refused', structureId: destId, fromId: belt.id, kind: st.item!.kind, reason });
+    const st = world.structures[beltId].belt!;
+    st.block = info.reason;
+    st.stuckTicks += 1;
+    if (st.stuckTicks === 1 && info.reason !== 'queue') {
+      events.push({ type: 'refused', structureId: info.destId, fromId: beltId, kind: st.item!.kind, reason: info.reason });
+    }
   }
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { store } from '../app/store';
 import { STRUCTURES } from '../sim/data/structures';
 import { ITEMS } from '../sim/data/items';
-import { DIR_NAMES } from '../sim/grid';
+import { fmt, S } from './strings';
 
 /** Floating label near the pointer while a tool is active. Position updates outside React. */
 export function BuildHint() {
@@ -21,30 +21,30 @@ export function BuildHint() {
   let bad = false;
   if (ui.tool.type === 'build') {
     const def = STRUCTURES[ui.tool.kind];
-    const check = ui.dragPath ? { ok: true } : store.sim.canPlace(ui.tool.kind, ui.hover.x, ui.hover.y);
     if (ui.dragPath) {
       const n = ui.dragPath.length;
-      text = `${n} belt${n === 1 ? '' : 's'} · ${n * def.cost} coins`;
-      sub = 'release to lay, R to rotate';
+      text = n === 1 ? fmt(S.palette.beltCount, { cost: def.cost }) : fmt(S.palette.beltsCount, { n, cost: n * def.cost });
+      sub = S.palette.releaseToLay;
     } else {
-      text = `${def.name} · ${def.cost} coins`;
-      sub = check.ok ? (def.hasFacing ? `facing ${DIR_NAMES[ui.buildFacing]} · R to rotate` : 'click to place') : (check.message ?? '');
+      const check = store.sim.canPlace(ui.tool.kind, ui.hover.x, ui.hover.y);
+      text = `${def.name} · ${fmt(S.palette.cost, { cost: def.cost })}`;
+      sub = check.ok ? (def.hasFacing ? `${fmt(S.palette.facing, { facing: S.facing[ui.buildFacing] })} · ${S.palette.rotateHint}` : S.palette.clickToPlace) : (check.message ?? '');
       bad = !check.ok;
     }
   } else if (ui.tool.type === 'remove') {
     const t = store.sim.at(ui.hover.x, ui.hover.y);
-    if (t) {
-      text = `Remove ${STRUCTURES[t.kind].name}`;
-      sub = `refund ${STRUCTURES[t.kind].cost} coins`;
+    if (t && STRUCTURES[t.kind].removable) {
+      text = fmt(S.palette.removeWhat, { name: STRUCTURES[t.kind].name });
+      sub = fmt(S.palette.refundLine, { coins: STRUCTURES[t.kind].refund });
     } else {
-      text = 'Nothing here to remove';
+      text = t ? `The ${STRUCTURES[t.kind].name} stays in the yard.` : S.palette.nothingHere;
       bad = true;
     }
   } else {
-    text = `Place ${ITEMS[ui.tool.kind].name}`;
+    text = fmt(S.palette.placeItem, { item: ITEMS[ui.tool.kind].name });
     const t = store.sim.at(ui.hover.x, ui.hover.y);
     bad = !t || t.kind !== 'belt' || !!t.belt?.item;
-    sub = bad ? 'needs an empty belt' : 'click to drop it on this belt';
+    sub = bad ? S.palette.needsBelt : S.palette.dropHere;
   }
   return (
     <div ref={ref} className={'buildhint' + (bad ? ' bad' : '')} style={{ left: 0, top: 0 }} aria-hidden>
