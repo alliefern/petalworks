@@ -204,11 +204,15 @@ export class PetalScene extends Phaser.Scene {
     // The organic border: traced around the open tiles, smoothed and wobbled, pushed a
     // little outward so the curve clears the buildable tiles' corners.
     const loops = organicOutline(openTiles, TILE, 7).map((l) => offset(l, TILE * 0.12));
+    // The closed preview continues the lawn past the hedge, so the soft fade into the
+    // surroundings follows the *outer* edge (open + closed tiles) with the same curve;
+    // with nothing closed, the fade sits on the hedge line itself.
+    const future = closedTiles.length ? organicOutline([...openTiles, ...closedTiles], TILE, 7).map((l) => offset(l, TILE * 0.12)) : loops;
     const fade = this.add.graphics().setDepth(DEPTH.ground + 0.3);
     const border = this.add.graphics().setDepth(DEPTH.ground + 0.5);
     this.ground.sort((a, b) => a.depth - b.depth);
-    for (const loop of loops) {
-      // Soft fade from the border out past the lawn apron: linen strokes along outward
+    for (const loop of future) {
+      // Soft fade from the outer edge out past the lawn apron: linen strokes along outward
       // offsets of the curve, each a little stronger, so the lawn melts into the surroundings.
       // (Strokes, not ring triangles: offsets self-cross at tight bays and triangles would flip.)
       const steps = 14;
@@ -221,6 +225,8 @@ export class PetalScene extends Phaser.Scene {
       }
       fade.lineStyle(TILE * 0.8, COLORS.linen, 1);
       fade.strokePoints(offset(loop, reach + TILE * 0.35), true, true);
+    }
+    for (const loop of loops) {
       // One continuous painted border: a soft glow, the line, and a thin cream highlight.
       border.lineStyle(14, COLORS.cream, 0.28);
       border.strokePoints(loop, true, true);
@@ -249,12 +255,13 @@ export class PetalScene extends Phaser.Scene {
     // Closed field preview: a tint, the future border as a dotted kraft curve, and one
     // label placed on the closed tile farthest from the field's own edge so it fits inside.
     if (closedTiles.length) {
+      // The tint fills the smooth future outline (not tile squares); open tiles sit above
+      // it, so only the closed field shows the tint, and its outer edge is the curve.
       const tint = this.add.graphics().setDepth(DEPTH.ground + 0.2);
       tint.fillStyle(COLORS.moss, 0.2);
-      for (const t of closedTiles) tint.fillRect(t.x * TILE, t.y * TILE, TILE + 1, TILE + 1);
+      for (const loop of future) tint.fillPoints(loop, true);
       const dashed = this.add.graphics().setDepth(DEPTH.ground + 0.55);
       this.lockedGfx.push(dashed);
-      const future = organicOutline([...openTiles, ...closedTiles], TILE, 7).map((l) => offset(l, TILE * 0.12));
       for (const loop of future) {
         const pts = resample(loop, 10);
         dashed.lineStyle(3, 0xc9a978, 0.9);

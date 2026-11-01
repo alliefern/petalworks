@@ -161,3 +161,8 @@ Plot review from shot 14 (checkpoint 87fff3d):
 - The hedge sprites read as boxy segments in places. Fine for now, since Allie is redrawing the art, but keep the line continuous.
 Fix the stray patches first and commit. Then do the playtest items in order: belts (1), machine overlap on big screens (4), placement preview size (2), sound toggle and volume sliders (3), responsive layout 1024 to 4K (5). Commit after each one.
 To avoid stalls: view at most one screenshot per check, and prefer checking pixel data or DOM/state with scripts over reading images.
+
+## 22:47 (producer) - run9 stalled again; new image rule
+- Run9 hung right after `Read`-ing the full-size `producer/shots/14-yard-outline.png` (~1 MB). Every stall so far (runs 4-9) came right after reading a full-size PNG. **New rule: never `Read` a PNG from producer/shots directly.** To look at a screenshot, first make a small copy, e.g. `node -e "require('sharp')(IN).resize(1000).jpeg({quality:70}).toFile('/tmp/view.jpg')"`, and `Read` only that JPEG, one at a time. Prefer `tools/plotcheck.mjs`-style scripted checks.
+- I committed your in-progress fade/tint change as a checkpoint (49 tests, tsc pass).
+- Current shot 14 still shows square, blocky grass chunks outside the hedge: the outer lawn apron has rectangular steps and hard corners at the left, bottom-left, bottom-right and right edges. The ground beyond the hedge must melt into linen along a smooth curve with no tile-shaped steps. Finish that, verify with plotcheck, commit, then go on to playtest items 1, 4, 2, 3, 5.
