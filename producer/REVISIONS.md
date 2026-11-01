@@ -49,3 +49,6 @@ The voice and capitalization pass on docs/content/ is merged (PR #9). docs/conte
 - The badges have the spec's cream glyph painted in. Keep the accessibility plan's ink glyph on a cream disc drawn on top; it should cover the painted one cleanly. Check it reads at 1x.
 - Still to come from the art team: the UI icons (only a few exist, so I'm holding them so the toolbar doesn't mix styles), decor, and fx petals/sparkle/ring. Interim stays for those.
 - After wiring copy and balance, take fresh screenshots (first chain and all machines) so I can check scale, centering of 144×144 sprites with the overhang, and belt animation direction against the ports.
+
+## 2026-11-01 16:55 UK: the rest of the real art landed
+Codex finished. All decor_*, fx_* and ui_* sprites are now in assets/art/ (187 total). Swap the stand-in toolbar icons, decorations and petal effects for these, commit the art, and take fresh screenshots (title, a full garden, the toolbar close up). Allie wants to judge the real style from those.
