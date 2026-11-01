@@ -1,0 +1,526 @@
+{
+  "title": {
+    "metaTitle": "Petalworks",
+    "name": "Petalworks",
+    "tagline": "A cozy flower workshop.",
+    "continue": "Continue",
+    "continueHint": "Pick up your saved garden.",
+    "newGame": "New Game",
+    "settings": "Settings",
+    "howToPlay": "How to Play",
+    "savedHere": "Your garden is saved on this device.",
+    "soundHint": "Sound starts after your first click."
+  },
+  "newGameConfirm": {
+    "title": "Start a new game?",
+    "body": "This erases your saved garden, coins, and orders.",
+    "confirm": "Start New Game",
+    "cancel": "Cancel"
+  },
+  "save": {
+    "unreadableTitle": "Couldn't open that save",
+    "unreadableBody": "The saved garden can't be read. Start a new game to keep playing.",
+    "unreadableConfirm": "Start New Game",
+    "unreadableCancel": "Not now"
+  },
+  "settings": {
+    "title": "Settings",
+    "sound": "Sound effects",
+    "music": "Music",
+    "reducedMotion": "Reduced motion",
+    "reducedMotionHelp": "Quiets extra movement. The garden still runs.",
+    "howToPlay": "How to Play",
+    "backToTitle": "Title screen",
+    "close": "Close",
+    "on": "On",
+    "off": "Off"
+  },
+  "howTo": {
+    "title": "How to Play",
+    "intro": "You run the workshop. Place beds and machines, connect them with belts, and fill the order at the top.",
+    "skipNote": "Tips can be skipped. Open this panel any time to read them again.",
+    "tipsTitle": "First order",
+    "laterTitle": "Later orders",
+    "controlsTitle": "Controls",
+    "replay": "Replay tips",
+    "close": "Close"
+  },
+  "controls": [
+    { "id": "place", "action": "Place or select", "input": "Left-click" },
+    { "id": "belt", "action": "Lay belts", "input": "Click and drag" },
+    { "id": "rotate", "action": "Rotate", "input": "R" },
+    { "id": "cancel", "action": "Cancel", "input": "Esc or right-click" },
+    { "id": "undo", "action": "Undo last build", "input": "Z" },
+    { "id": "remove", "action": "Remove", "input": "Remove tool" },
+    { "id": "pan", "action": "Pan", "input": "Drag empty grass, or middle mouse" },
+    { "id": "zoom", "action": "Zoom", "input": "Mouse wheel" },
+    { "id": "pause", "action": "Pause or resume", "input": "Pause button" },
+    { "id": "fast", "action": "Run faster", "input": "Fast button" },
+    { "id": "menus", "action": "Move through buttons", "input": "Tab, then Enter" }
+  ],
+  "hud": {
+    "coins": "Coins",
+    "coinsValue": "{coins}",
+    "order": "Order",
+    "orderFor": "{customer}",
+    "orderShort": "{short}",
+    "orderProgress": "{have} / {need}",
+    "orderDelivered": "Delivered {have} of {need}",
+    "noOrder": "No open order",
+    "paused": "Paused",
+    "pausedDetail": "The garden is paused.",
+    "pause": "Pause",
+    "resume": "Resume",
+    "fast": "Fast",
+    "fastTooltip": "Run the garden a little faster.",
+    "normalTooltip": "Normal speed.",
+    "build": "Build",
+    "buildShow": "Show build menu",
+    "buildHide": "Hide build menu",
+    "settings": "Settings",
+    "help": "How to Play",
+    "undo": "Undo",
+    "undoTooltip": "Undo the last build.",
+    "rotate": "Rotate",
+    "rotateTooltip": "Rotate. Also the R key.",
+    "basket": "Basket"
+  },
+  "a11y": {
+    "game": "Petalworks garden",
+    "buildPalette": "Build menu",
+    "inspector": "Selected structure",
+    "order": "Current order, {summary}",
+    "orderSummary": "{customer} needs {short}. Reward: {coins} coins. {note}",
+    "coins": "{coins} coins",
+    "pause": "Pause the garden",
+    "resume": "Resume the garden",
+    "fastOn": "Fast speed, on",
+    "fastOff": "Fast speed, off",
+    "settings": "Settings",
+    "help": "How to Play",
+    "close": "Close",
+    "undo": "Undo last build",
+    "rotate": "Rotate",
+    "remove": "Remove tool",
+    "basket": "Basket, {count} items",
+    "basketItem": "Place {item} from the basket",
+    "soundOn": "Sound effects on",
+    "soundOff": "Sound effects off",
+    "musicOn": "Music on",
+    "musicOff": "Music off",
+    "reducedMotionOn": "Reduced motion on",
+    "reducedMotionOff": "Reduced motion off"
+  },
+  "palette": {
+    "title": "Build",
+    "locked": "Unlocks later.",
+    "cost": "{cost} coins",
+    "groups": {
+      "grow": "Grow",
+      "move": "Move",
+      "make": "Make",
+      "pack": "Pack",
+      "tools": "Tools"
+    },
+    "hint": {
+      "place": "Click grass to place it. R rotates. Esc cancels.",
+      "belt": "Drag a path on grass. R rotates. Esc cancels.",
+      "remove": "Click a structure to pick it up. Esc cancels."
+    },
+    "buildings": {
+      "daisyBed": {
+        "group": "grow",
+        "name": "Daisy Bed",
+        "tooltip": "Grows one daisy at a time, from the side you aim.",
+        "inspector": "Flowers leave one at a time from the side it faces.",
+        "recipe": "daisy"
+      },
+      "lavenderBed": {
+        "group": "grow",
+        "name": "Lavender Bed",
+        "tooltip": "Grows one sprig at a time, from the side you aim. Slower than daisies.",
+        "inspector": "Sprigs leave one at a time from the side it faces.",
+        "recipe": "lavender"
+      },
+      "belt": {
+        "group": "move",
+        "name": "Belt",
+        "tooltip": "Carries one item per tile, only in the direction it faces.",
+        "inspector": "Holds one item. The arrow is the way it moves.",
+        "recipe": null
+      },
+      "bundlingTable": {
+        "group": "make",
+        "name": "Bundling Table",
+        "tooltip": "Ties 2 daisies into one Daisy Bundle.",
+        "inspector": "Takes daisies from any side. Bundles leave the way it faces.",
+        "recipe": "daisyBundle"
+      },
+      "dryingBench": {
+        "group": "make",
+        "name": "Drying Bench",
+        "tooltip": "Dries 2 lavender into one Lavender Sachet.",
+        "inspector": "Takes lavender from any side. Sachets leave the way it faces.",
+        "recipe": "lavenderSachet"
+      },
+      "arrangementTable": {
+        "group": "make",
+        "name": "Arrangement Table",
+        "tooltip": "Makes a Mixed Bouquet from one bundle and one sachet.",
+        "inspector": "Takes a bundle and a sachet from any side. Bouquets leave the way it faces.",
+        "recipe": "mixedBouquet"
+      },
+      "packingStation": {
+        "group": "pack",
+        "name": "Packing Station",
+        "tooltip": "Takes deliveries and counts them toward the open order.",
+        "inspector": "Takes a delivery from any side. Counts go to the order. Nothing leaves.",
+        "recipe": null
+      }
+    },
+    "tools": {
+      "remove": {
+        "group": "tools",
+        "name": "Remove",
+        "tooltip": "Picks up a structure. Items on it go to the basket."
+      }
+    }
+  },
+  "items": {
+    "daisy": { "one": "Daisy", "other": "Daisies" },
+    "lavender": { "one": "Lavender", "other": "Lavender" },
+    "daisyBundle": { "one": "Daisy Bundle", "other": "Daisy Bundles" },
+    "lavenderSachet": { "one": "Lavender Sachet", "other": "Lavender Sachets" },
+    "mixedBouquet": { "one": "Mixed Bouquet", "other": "Mixed Bouquets" }
+  },
+  "recipes": {
+    "daisy": {
+      "line": "Grows 1 Daisy",
+      "out": "1 Daisy",
+      "time": "{seconds} seconds"
+    },
+    "lavender": {
+      "line": "Grows 1 Lavender",
+      "out": "1 Lavender",
+      "time": "{seconds} seconds"
+    },
+    "daisyBundle": {
+      "line": "2 Daisies → 1 Daisy Bundle",
+      "in": "2 Daisies",
+      "out": "1 Daisy Bundle",
+      "time": "{seconds} seconds"
+    },
+    "lavenderSachet": {
+      "line": "2 Lavender → 1 Lavender Sachet",
+      "in": "2 Lavender",
+      "out": "1 Lavender Sachet",
+      "time": "{seconds} seconds"
+    },
+    "mixedBouquet": {
+      "line": "1 Daisy Bundle + 1 Lavender Sachet → 1 Mixed Bouquet",
+      "in": "1 Daisy Bundle + 1 Lavender Sachet",
+      "out": "1 Mixed Bouquet",
+      "time": "{seconds} seconds"
+    }
+  },
+  "facing": {
+    "n": "up",
+    "e": "right",
+    "s": "down",
+    "w": "left"
+  },
+  "states": {
+    "growing": {
+      "label": "Growing",
+      "detail": "Not ready yet."
+    },
+    "ready": {
+      "label": "Ready",
+      "detail": "{item} can move on."
+    },
+    "processing": {
+      "label": "Processing",
+      "detail": "Making {item}."
+    },
+    "waiting": {
+      "label": "Waiting for inputs",
+      "detail": "Needs {takes}."
+    },
+    "waitingFor": {
+      "label": "Waiting for {count} {item}",
+      "detail": "{have} of {need} in."
+    },
+    "blocked": {
+      "exitFull": {
+        "label": "Blocked: exit is full",
+        "detail": "The next tile is full. This will move when a space opens."
+      },
+      "noExit": {
+        "label": "Blocked: nothing connected",
+        "detail": "Aim the output at a belt or a machine."
+      },
+      "wrongItem": {
+        "label": "Blocked: won't take {item}",
+        "detail": "{machine} does not use {item}. Pick it up with Remove. The item goes to the basket."
+      },
+      "inputFull": {
+        "label": "Blocked: input is full",
+        "detail": "The input is full. Room opens when this craft finishes."
+      },
+      "beltEnd": {
+        "label": "Blocked: belt ends here",
+        "detail": "Extend the belt, or aim it into a machine."
+      },
+      "refused": {
+        "label": "Blocked: won't take {item}",
+        "detail": "{target} does not take {item}. Aim the belt somewhere that does."
+      }
+    },
+    "belt": {
+      "empty": {
+        "label": "Empty",
+        "detail": "Moves items {facing}."
+      },
+      "carrying": {
+        "label": "Carrying {item}",
+        "detail": "Heading {facing}."
+      }
+    },
+    "packing": {
+      "waiting": {
+        "label": "Waiting for a delivery",
+        "detail": "Send finished goods here on a belt."
+      },
+      "receiving": {
+        "label": "Receiving",
+        "detail": "A delivery just arrived."
+      },
+      "stored": {
+        "label": "Stored",
+        "detail": "{count} {item} held here."
+      },
+      "storedUnused": {
+        "label": "Stored",
+        "detail": "No open order needs {item}. It stays here."
+      }
+    }
+  },
+  "inspector": {
+    "emptyTitle": "Nothing selected",
+    "emptyBody": "Click a bed, belt, or machine.",
+    "labels": {
+      "status": "Status",
+      "recipe": "Recipe",
+      "takes": "Takes",
+      "makes": "Makes",
+      "grows": "Grows",
+      "time": "Time",
+      "progress": "Progress",
+      "inputs": "Inputs",
+      "output": "Output",
+      "holds": "Holding",
+      "sends": "Sends",
+      "stored": "Stored"
+    },
+    "values": {
+      "progress": "{elapsed}s of {total}s",
+      "input": "{have} / {need} {item}",
+      "sends": "Faces {facing}",
+      "holds": "{item}",
+      "empty": "Empty",
+      "stored": "{count} {item}",
+      "storedEmpty": "Nothing stored yet."
+    }
+  },
+  "errors": {
+    "occupied": "That tile already has something on it.",
+    "outside": "That spot is outside the garden.",
+    "lockedPlot": "That part of the garden is still closed.",
+    "hedge": "The hedge is a border. Build on open grass.",
+    "funds": "Not enough coins. This costs {cost}. You have {coins}.",
+    "fundsPath": "Not enough coins to finish this path.",
+    "locked": "That unlocks later.",
+    "rotateHolding": "Let {item} move off first, then turn it.",
+    "rotateOccupied": "Those tiles are taken, so it stays as it is.",
+    "undoEmpty": "Nothing to undo yet.",
+    "undoUnsafe": "Undo would drop items, so nothing changed.",
+    "removeEmpty": "Nothing there to remove.",
+    "beltFull": "That belt is holding something.",
+    "basketPlace": "Put that on an empty belt.",
+    "dragSkipped": "Full tiles were skipped."
+  },
+  "basket": {
+    "title": "Basket",
+    "empty": "The basket is empty.",
+    "hint": "Click an item, then an empty belt, to send it back out.",
+    "removed": "{item} went to the basket.",
+    "removedMany": "Items went to the basket.",
+    "refund": "{coins} coins returned."
+  },
+  "orders": {
+    "labels": {
+      "needs": "Needs",
+      "reward": "Reward",
+      "from": "For"
+    },
+    "order1": {
+      "customer": "Nell",
+      "note": "Two loose daisies. I keep one glass by the sink.",
+      "itemId": "daisy",
+      "count": 2,
+      "requirement": "Deliver 2 Daisies",
+      "short": "2 Daisies",
+      "reward": "Pays {coins} coins",
+      "complete": "Nell's daisies are packed.",
+      "unlocks": ["bundlingTable"],
+      "unlockLine": "Bundling Table unlocked. Two daisies make one Daisy Bundle."
+    },
+    "order2": {
+      "customer": "Otto",
+      "note": "Bundle them, please. Loose stems make a mess of my satchel.",
+      "itemId": "daisyBundle",
+      "count": 2,
+      "requirement": "Deliver 2 Daisy Bundles",
+      "short": "2 Daisy Bundles",
+      "reward": "Pays {coins} coins",
+      "complete": "Otto's bundles are packed.",
+      "unlocks": [],
+      "unlockLine": null
+    },
+    "order3": {
+      "customer": "Hester",
+      "note": "Four bundles for the counter. Saturday gets busy.",
+      "itemId": "daisyBundle",
+      "count": 4,
+      "requirement": "Deliver 4 Daisy Bundles",
+      "short": "4 Daisy Bundles",
+      "reward": "Pays {coins} coins",
+      "complete": "Hester's four bundles are packed.",
+      "unlocks": ["lavenderBed"],
+      "unlockLine": "Lavender Bed unlocked. It grows lavender more slowly than daisies."
+    },
+    "order4": {
+      "customer": "Ivo",
+      "note": "Leave them loose. I'll take the sprigs as they are.",
+      "itemId": "lavender",
+      "count": 2,
+      "requirement": "Deliver 2 Lavender",
+      "short": "2 Lavender",
+      "reward": "Pays {coins} coins",
+      "complete": "Ivo's lavender is packed.",
+      "unlocks": ["dryingBench"],
+      "unlockLine": "Drying Bench unlocked. Two lavender make one Lavender Sachet."
+    },
+    "order5": {
+      "customer": "Pia",
+      "note": "Two sachets for the linen shelf, when you have them.",
+      "itemId": "lavenderSachet",
+      "count": 2,
+      "requirement": "Deliver 2 Lavender Sachets",
+      "short": "2 Lavender Sachets",
+      "reward": "Pays {coins} coins",
+      "complete": "Pia's sachets are packed.",
+      "unlocks": ["arrangementTable"],
+      "unlockLine": "Arrangement Table unlocked. A bundle and a sachet make one Mixed Bouquet."
+    },
+    "order6": {
+      "customer": "Ada",
+      "note": "One bouquet for the table. Daisies and lavender together.",
+      "itemId": "mixedBouquet",
+      "count": 1,
+      "requirement": "Deliver 1 Mixed Bouquet",
+      "short": "1 Mixed Bouquet",
+      "reward": "Pays {coins} coins",
+      "complete": "Ada's bouquet is packed.",
+      "unlocks": [],
+      "unlockLine": null
+    }
+  },
+  "celebration": {
+    "earned": "Earned {coins} coins."
+  },
+  "ending": {
+    "title": "Orders complete",
+    "body": "All six orders are packed and paid. The garden is still yours. Keep building, or let the belts run.",
+    "button": "Keep Building",
+    "sandbox": "The garden is yours to run."
+  },
+  "expansion": {
+    "button": "Open Plot",
+    "tooltip": "Open more grass to build on.",
+    "confirmTitle": "Open the far plot?",
+    "confirmBody": "Adds grass past the current hedge. You can build on it right away.",
+    "confirmCost": "Costs {cost} coins.",
+    "confirmFree": "No cost.",
+    "confirmYes": "Open Plot",
+    "confirmNo": "Not now",
+    "opened": "The far plot is open.",
+    "cantAfford": "Not enough coins. Opening the plot costs {cost}. You have {coins}.",
+    "lockedHint": "More garden opens later."
+  },
+  "tutorial": {
+    "skip": "Skip",
+    "next": "Next",
+    "back": "Back",
+    "gotIt": "Got it",
+    "done": "Done",
+    "step": "Tip {current} of {total}",
+    "skipped": "Tips hidden. Open How to Play to read them again.",
+    "opening": [
+      {
+        "id": "see-order",
+        "prompt": "Nell's order is at the top: 2 daisies. They count only when they reach a packing station."
+      },
+      {
+        "id": "place-bed",
+        "prompt": "Open Build and place a Daisy Bed on open grass. That is where daisies grow. Press R to aim the side they leave from."
+      },
+      {
+        "id": "place-packing",
+        "prompt": "Choose Packing Station and place it a few tiles away. A daisy counts only if it arrives there."
+      },
+      {
+        "id": "lay-belt",
+        "prompt": "Choose Belt and drag from the bed to packing. Each tile holds one item and moves it forward."
+      },
+      {
+        "id": "turn-belt",
+        "prompt": "Press R to turn a belt. Keep the tiles touching, so each item has a next step."
+      },
+      {
+        "id": "watch-flow",
+        "prompt": "Wait a few seconds for a daisy to move onto the belt. If it stops, the status line says why."
+      },
+      {
+        "id": "fill-order",
+        "prompt": "Send 2 daisies into packing. The order updates on its own, then pays you."
+      },
+      {
+        "id": "fix-mistakes",
+        "prompt": "Press Z to undo a build. Remove sends items to the basket. Esc or right-click cancels."
+      }
+    ],
+    "contextual": {
+      "bundles": {
+        "orderId": "order2",
+        "prompt": "Otto wants Daisy Bundles. Place a Bundling Table on the belt path. It needs 2 daisies."
+      },
+      "more-bundles": {
+        "orderId": "order3",
+        "prompt": "Hester wants 4 bundles. Add a second Daisy Bed and belt it to the Bundling Table."
+      },
+      "lavender": {
+        "orderId": "order4",
+        "prompt": "Ivo wants raw lavender. Place a Lavender Bed and belt it to packing. It grows more slowly than daisies."
+      },
+      "sachets": {
+        "orderId": "order5",
+        "prompt": "Pia wants Lavender Sachets. Place a Drying Bench. Belt lavender in and sachets out to packing."
+      },
+      "bouquet": {
+        "orderId": "order6",
+        "prompt": "Ada wants 1 Mixed Bouquet. Feed an Arrangement Table one Daisy Bundle and one Lavender Sachet, then belt it to packing."
+      }
+    }
+  }
+}
