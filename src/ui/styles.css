@@ -275,6 +275,7 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible, a:focus-vis
   padding: 16px 22px; min-width: 320px;
   border-color: var(--honey-deep);
   animation: rise 220ms ease-out;
+  pointer-events: none; /* a beat, not a dialog: clicks on the yard still land */
 }
 .celebration .ctitle { font-weight: 800; font-size: 20px; }
 .celebration .cline { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--honey-deep); }

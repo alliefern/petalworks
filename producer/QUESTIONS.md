@@ -15,3 +15,5 @@ Each has the default I am building with. None blocks progress. (1–6 and the nu
 6. **Push rights.** `git push origin main` is rejected here (no GitHub token in the sandbox). Everything is committed locally on `main`. Options: pull from this checkout, or set `GH_TOKEN`/a credential helper for me and I'll push. Until then the Vercel build stays at the producer's last push.
 
 7. **copy.json extra gained one key.** The title's loading bar needs "Loading the garden" (`extra.title.loadingGarden`). PR #12's test requires every leftover string to exist in copy.json, so I added that key with my placeholder text. Edit the wording as you like.
+
+8. **1024×640 and the side cards.** Fit shows the whole yard at the 40 px floor, which is 640 px wide; the tip and order cards are 212 px each, so both cannot clear the yard in a 1024 px window (needs about 1064). The default framing keeps the used area clear, and every click in the scripted playthrough lands. **Default: leave it**, documented in KNOWN_ISSUES. Alternative if you want zero overlap there: auto-collapse the tip card to a pill below 1064 px.

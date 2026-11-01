@@ -17,7 +17,7 @@ Honest list. Nothing here is disguised as finished.
 - The copy's "place a Packing Station" opening tip is skipped because the station is pre-placed.
 
 ## Layout
-- At 1024 px wide the tip card and order card cover the yard's outer columns (the default framing keeps the first chain clear, and the cards shrink below 1150 px). From 1280 px up the cards sit beside the yard.
+- Below about 1064 px wide, Fit (the whole 16-tile yard at the 40 px tile floor) cannot sit beside both side cards (212 px each), so at 1024×640 the cards cover the yard's outer columns after Fit. The default framing (the used area) stays clear of the cards at every size, and the cards shrink below 1150 px. From 1280 px up the whole yard fits beside the cards.
 
 ## Performance
 - First load at Slow 4G is about 7.8 s to a clickable New Game (1.43 MB). The remaining weight is Phaser's bundle and three full Nunito TTFs; font subsetting and a slimmer Phaser build are not done.

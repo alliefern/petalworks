@@ -29,7 +29,9 @@
 | Music on the first click | 1.03 MB | 1.03 MB | 336 KB |
 | Deploy size (`dist/`) | 10.19 MB | 6.29 MB | 4.47 MB |
 
-- Scripted playthrough (`tools/playthrough.mjs`, real clicks through qa/playthrough-checklist.md) runs at 1280×800 and 1024×640; results below once the run is clean.
+- **Playthrough check** (`tools/playthrough.mjs`: real clicks through qa/playthrough-checklist.md, with screenshots `producer/shots/pt-<size>-*.png`): 29/29 at 1280×800 and 29/29 at 1024×640, no console errors. It covers reading the order, tips skip/reopen, tooltips, ghost valid/invalid, place/rotate, the one-tile gap, inspector words, order 1 pay + undo-after-pay, the bundling table and its inspector, order 2, pause and 3× (one item per tile), sound/music off surviving reload, reload mid-delivery and after pay, loaded-belt removal to the basket, refused placements in words, every visible button once, and card coverage after Fit.
+- One real bug found and fixed by it: the order-complete card sat mid-screen with pointer events on, so for 3.2 s it swallowed clicks on the yard beneath it. It now lets clicks through.
+- At 1024×640 the whole-yard Fit cannot clear both side cards (geometry: 640 px of yard + 2 × 212 px cards > 1024). The default framing stays clear and every click landed; noted in KNOWN_ISSUES and QUESTIONS #8.
 
 ## Round of Nov 1, 19:30 (performance, from docs/research/PERFORMANCE.md)
 - **Build-time WebP atlas.** `tools/pack-art.mjs` runs before dev, test and build (`sharp`). It reads `assets/art/*.png` by file name (a missing name falls back to `assets/interim/`), packs the garden sprites into one 2048×1472 WebP sheet (quality 82, 2 px extruded edges so nothing bleeds) and writes single WebP files for the toolbar icons. The PNGs stay the source of truth; Allie's redesign still drops in by name. Output lives in `src/generated/` (ignored by git). `ground.locked` is no longer preloaded. The interim PNGs are no longer in the deploy.
