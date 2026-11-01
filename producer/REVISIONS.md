@@ -30,3 +30,7 @@ Two more docs-only PRs are in main (nothing of yours touched):
 
 ## 2026-11-01 16:25 UK: Steam guardrails
 Allie plans a Steam release later (Electron wrapper, steamworks.js). Read section 3, "What the current build should keep true", of docs/research/STEAM_PLAN.md and follow it now, so Steam stays easy. Don't add Electron or Steam code yet. Note anything you change in STATUS.md.
+
+## 2026-11-01 16:30 UK: first real art landed
+- Accepted final art is now in `assets/art/` (untracked, please commit it with your next commit): `ground_grass_0..3`, `item_daisy`, `machine_packing_idle`, `machine_packing_receive0..3`. These are complete sets, so they replace their interim stand-ins cleanly through the manifest.
+- I held back belts, daisy beds and the bundling table until every frame and facing exists, so you won't get real and interim frames mixed in one animation. Check the manifest falls back per file and that 144×144 sprites with the 8 px overhang sit centered on their tile. Take a fresh screenshot of the first chain once it's in.
