@@ -37,3 +37,9 @@ Allie plans a Steam release later (Electron wrapper, steamworks.js). Read sectio
 
 ## 2026-11-01 16:40 UK: game copy is ready to wire in
 The voice and capitalization pass on docs/content/ is merged (PR #9). docs/content/copy.json is the final text: wire it in for all player-facing strings, replacing the older customer names and placeholder text in the sim. Fill the {coins} and {cost} placeholders from the balance data. src/sim/data does not match docs/design/BALANCE.md yet, so update it to those numbers (see the earlier balance note). Unlock timing: a building becomes available as the order that needs it starts, which is the same moment the previous order packs. Keep the sim's unlock-on-order-start behavior, and make the unlock set match BALANCE.md (Lavender Bed with order 4, Drying Bench with order 5, Arrangement Table with order 6, optional expansion from order 4). Run python3 docs/content/check_copy.py after wiring.
+
+## 2026-11-01 16:47 UK: visual review of 04-all-machines.png
+1. Buildings read too small and sparse on the grass, and most of the yard is empty lawn. Check tile scale against ASSET_SPECS (64px tiles), make sure buildings fill their tile footprint, and consider a default zoom that frames the playable yard more tightly.
+2. Toasts stack up 4 deep at the top center and cover the garden. Cap visible toasts at 2, merge repeated coin-refund toasts, and keep the blocked warning near the building, not as a big banner.
+3. The status bubble icons ("...", "!") are tiny. Follow docs/design/ACCESSIBILITY.md: ink glyphs on cream discs, readable at 100% zoom.
+4. The tip card and order card both float over the yard. Make sure neither covers the playable grid at 1366x768.
