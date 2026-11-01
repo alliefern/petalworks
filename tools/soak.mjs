@@ -17,6 +17,10 @@ await page.evaluate(() => {
   const s = window.petalworks;
   s.sim.world.coins = 400;
   s.sim.world.unlocked = ['belt', 'daisy_bed', 'lavender_bed', 'bundling_table', 'drying_bench', 'arrangement_table'];
+  // Open market so every product sells and nothing parks on a stock cap: a true long-run flow test.
+  s.sim.world.orders = { activeId: null, offeredIds: [], completedIds: ['order1', 'order2', 'order3', 'order4', 'order5', 'order6'], progress: { orderId: null, delivered: {} } };
+  s.sim.world.expansionUnlocked = true;
+  s.ui.settings.seenCompletion = true;
   // Daisy line: two beds -> bundling -> arrangement -> packing(13,6)
   s.dispatch({ type: 'place', kind: 'daisy_bed', x: 7, y: 6, facing: 1 });
   s.dispatch({ type: 'place', kind: 'daisy_bed', x: 8, y: 4, facing: 2 });
