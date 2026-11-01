@@ -522,5 +522,148 @@
         "prompt": "Ada wants 1 Mixed Bouquet. Give an Arrangement Table one Daisy Bundle and one Lavender Sachet, then belt it to the Packing Station."
       }
     }
+  },
+  "extra": {
+    "settings": {
+      "paused": "The garden is paused while Settings is open.",
+      "soundHelp": "Taps, pops, and chimes.",
+      "musicHelp": "A quiet music-box tune.",
+      "tutorial": "Tips",
+      "tutorialHelp": "Show the tips again from the start.",
+      "newGame": "Start over",
+      "newGameHelp": "This erases your saved garden, coins, and orders.",
+      "newGameButton": "New Game",
+      "keep": "Keep this garden",
+      "backToGarden": "Back to the garden"
+    },
+    "hud": {
+      "orders": "Orders",
+      "speed": "Speed",
+      "speedN": "{n}×",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fit": "Fit",
+      "fitTooltip": "Fit the garden on screen, or press Home.",
+      "tips": "Tips",
+      "tipsTooltip": "Open How to Play, or press H.",
+      "orderOf": "Order {n} of {total}",
+      "forCustomer": "For {customer}",
+      "sandboxBody": "Everything you deliver now sells for coins, and you can place every building.",
+      "ordersDone": "{done} of {total} orders packed"
+    },
+    "a11y": {
+      "gameHelp": "Arrow keys move the cursor. Press Enter to place or select. R rotates, and Esc cancels.",
+      "speedN": "Speed {n} times",
+      "notices": "Notices",
+      "cursorTile": "{what} at column {x}, row {y}",
+      "emptyTile": "Empty grass",
+      "skipToGarden": "Skip to the garden"
+    },
+    "palette": {
+      "refund": "Refund",
+      "facing": "Faces {facing}",
+      "rotateHint": "R rotates",
+      "clickToPlace": "Click to place.",
+      "releaseToLay": "Release to lay the path.",
+      "beltsCount": "{n} belts, {cost} coins",
+      "beltCount": "1 belt, {cost} coins",
+      "removeWhat": "Remove {name}",
+      "refundLine": "You get {coins} coins back.",
+      "staysInYard": "The {name} stays in the garden.",
+      "placeItem": "Place {item}",
+      "needsBelt": "Needs an empty belt.",
+      "dropHere": "Click to drop it on this belt.",
+      "expandLine": "The garden grows to 20 by 14 tiles."
+    },
+    "blocked": {
+      "headOn": "The belt ahead points back at this one, so turn one of them.",
+      "stockFull": "Blocked: enough of those",
+      "stockFullDetail": "The Packing Station is full of {item}. More can come in when an order needs them."
+    },
+    "states": {
+      "movesEvery": "Moves one tile every {seconds} seconds.",
+      "growsEvery": "One {item} every {seconds} seconds.",
+      "outputLeaves": "Output faces {facing}.",
+      "takesAnySide": "Takes ingredients from any side, and the output faces {facing}.",
+      "received": "Received {count}",
+      "readyCount": "{n} ready",
+      "packingSandbox": "With the orders done, goods sell for coins as they arrive.",
+      "packingCap": "Holds up to {cap} of each kind.",
+      "refused": "Won't take {item}. This recipe doesn't use it, or that slot is full."
+    },
+    "inspector": {
+      "recipeSeconds": "{line} in {seconds} seconds",
+      "holding": "Holding",
+      "rotateTip": "Rotate, or press R.",
+      "removeTip": "Remove for a refund, or press Delete."
+    },
+    "celebration": {
+      "expansionName": "Open Plot",
+      "unlockGeneric": "{name} is in the build menu now."
+    },
+    "ending": {
+      "ordersFilled": "Orders packed",
+      "itemsDelivered": "Items delivered",
+      "coinsEarned": "Coins earned"
+    },
+    "tutorial": {
+      "helpTitle": "How to Play",
+      "mouse": "Drag empty grass, or hold the middle mouse button, to pan. Scroll to zoom. Click a bed, belt, or machine to see details."
+    },
+    "errors": {
+      "notRemovable": "The {name} stays in the garden.",
+      "packingNoFacing": "The Packing Station takes deliveries from every side, so there is nothing to turn.",
+      "undoTaken": "That tile is taken now, so nothing changed.",
+      "undoFunds": "Not enough coins to put that back.",
+      "basketEmpty": "The basket has none of those.",
+      "expansionDone": "The far plot is already open.",
+      "expansionLocked": "More garden opens later."
+    },
+    "controlsExtra": [
+      [
+        "Arrows or WASD",
+        "Move the cursor"
+      ],
+      [
+        "Enter or Space",
+        "Place or select at the cursor"
+      ],
+      [
+        "Shift+R",
+        "Rotate the other way"
+      ],
+      [
+        "X",
+        "Remove tool"
+      ],
+      [
+        "Delete",
+        "Remove the selected structure"
+      ],
+      [
+        "B",
+        "Show or hide the build menu"
+      ],
+      [
+        "P",
+        "Pause or resume"
+      ],
+      [
+        "F",
+        "Change speed"
+      ],
+      [
+        "= and -",
+        "Zoom in or out"
+      ],
+      [
+        "Home",
+        "Fit the garden"
+      ],
+      [
+        "H",
+        "Open How to Play"
+      ]
+    ]
   }
 }
