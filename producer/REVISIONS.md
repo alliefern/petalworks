@@ -105,3 +105,13 @@ Pushed your run through 43b1712; 39 tests and the build pass here. The click-thr
 
 ## 21:07 UK, producer
 - Run4 stalled mid-thought around 20:51 with no output; I stopped it and resumed as run5. Commit the finished Sugar Belt music port first, then carry on with the irregular plot outline.
+
+## 2026-11-01 21:12 UK: plot shape reference from Allie (read before finishing the plot outline)
+Allie answered: "Make the plot an organic, irregular garden shape... like the edges of the plots in Northgard."
+What that means here, based on Northgard's territory borders:
+- The edge is a smooth, wobbly, hand-drawn-looking curve, not a stair-step of tile edges and not a perfect circle. Lumps and inlets of different sizes, like land shaped by nature.
+- The outline reads as one clear, continuous border line (soft and slightly glowing or painted), sitting on top of the ground, with the hedge following it.
+- Outside the border the ground fades softly into the surroundings instead of ending at a hard rectangle.
+- Gameplay stays on the tile grid: only tiles inside the shape are buildable. The curve is drawn around those tiles, smoothed.
+- Expansions should grow the shape organically along the same kind of curve, not add a rectangle.
+Take screenshots at 1280x800 and 1024 wide and put them in producer/shots/.
