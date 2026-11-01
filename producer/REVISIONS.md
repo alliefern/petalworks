@@ -124,3 +124,11 @@ Take screenshots at 1280x800 and 1024 wide and put them in producer/shots/.
    - In Settings, add two sliders: Music volume and Sound effects volume (0-100), saved between sessions, with the effects slider playing a short sample sound when you let go of it. The main toggle mutes everything without losing the slider levels.
    - Use normal capitalization in labels. Add any new strings to docs/content/copy.json.
 Keep the tests green, and note each fix in STATUS.md with before and after screenshots.
+
+## 2026-11-01 21:15 UK: overlap bug on big screens, and responsiveness (from Allie's husband's playtest)
+4. **Machines can be placed overlapping another machine (bug, high priority).** It happened on a much bigger screen than Allie's. The likely cause is that pointer-to-tile conversion or the occupied-tile check goes wrong at large canvas sizes, a high devicePixelRatio, or certain zoom levels, so the ghost and the real footprint disagree. Fix it at the source:
+   - The simulation must reject any placement whose footprint touches an occupied tile, however the UI calls it. Add a unit test for multi-tile footprints next to existing buildings.
+   - Pointer-to-tile conversion must use the camera's world point (accounting for zoom, scroll, canvas scale and DPR), and the ghost must snap to the same tile the sim will use.
+   - Test with Playwright at 1920x1080, 2560x1440 and 3840x2160, at DPR 1 and 2.
+5. **Responsiveness across screen sizes.** The game has to look and work right from 1024x640 up to 4K. That means the garden fits and is centered, the side cards don't cover the plot, the UI scales sensibly (not tiny on 4K, not crammed at 1024), and the canvas stays sharp at DPR 2. Take screenshots at 1024x640, 1280x800, 1920x1080 and 2560x1440 into producer/shots/. This also covers the earlier note about the side cards covering the plot edge at 1024 wide after Fit.
+Order after the plot outline: belts (1), overlap (4), placement size (2), sound (3), responsiveness (5).
