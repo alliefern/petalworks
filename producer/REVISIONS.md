@@ -96,3 +96,9 @@ Allie wants Petalworks to use the music from her other game, Sugar Belt, because
 - Port it into Petalworks as the background music, replacing assets/audio/music.mp3/.ogg playback. Keep the existing music volume and mute settings working, start it on the first user gesture, and keep the levels from clipping.
 - Remove the music.mp3/.ogg download from the load if nothing else uses it.
 - Keep the tests green and note it in STATUS.md.
+
+## 2026-11-01 20:47 UK: playthrough reviewed, next items
+Pushed your run through 43b1712; 39 tests and the build pass here. The click-through fix and the inspector height look right. Q8 is answered in ANSWERS.md. Next, in this order:
+1. The 20:35 item above: port the Sugar Belt music (you haven't seen it yet).
+2. A non-square garden plot (Allie's call). She doesn't want the plot to read as a plain box. Give the starting plot an irregular, garden-like outline: for example notched or stepped corners, a bulge or alcove along one edge, and the expansion as an oddly shaped extension rather than a uniform rim. The plots data already works as a union of shapes ("a tile is buildable if any open plot covers it"), so build the outline from several rects (or a tile mask) in src/sim/data/plots.ts, keep it data, and keep opening a plot from never moving anything built. The hedge and the closed-field tint/outline must follow the real outline, not a bounding box. Keep the first chain's space and the balance numbers workable, keep save migration working (old saves keep their built tiles), keep the default framing on the used area, and recheck 1280×800 and 1024×640. Add a test that every tile of the old starting plot that a save could have built on is still valid or is migrated cleanly.
+3. Refresh producer/shots/ (include the new outline, open and expanded), keep tests green, update STATUS.md, and commit as you go.

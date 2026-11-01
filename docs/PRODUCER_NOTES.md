@@ -25,3 +25,6 @@ These notes add to the brief. Where they conflict, these win.
 
 ## Capitalization (decided by Allie, 1 Nov 2026)
 All player-facing text in the game uses normal sentence/title capitalization, not all-lowercase. American English. This applies to docs/content/ copy, UI labels, orders and tooltips.
+
+## 2026-11-01 20:47 UK: plot shape
+Allie doesn't want the plot to be square or a plain rectangle. The garden plot has an irregular, garden-like outline built from data (several rects or a tile mask), and the expansion is an oddly shaped addition. The hedge follows the real outline.

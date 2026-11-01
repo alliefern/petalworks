@@ -19,3 +19,6 @@
 
 ## 2026-11-01 19:46 UK
 7. "Loading the garden" is fine as written (plain, normal capitalization). Keep the key and wording.
+
+## 2026-11-01 20:47 UK
+8. Leave it as documented for now. The new plot shape (REVISIONS 20:47) changes the yard's outline anyway, so recheck 1024×640 after that and only add the tip-card auto-collapse if the used area gets covered.
