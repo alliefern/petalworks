@@ -276,7 +276,9 @@ def main() -> int:
     ]
     if bad_added:
         problems.append(f"new keys outside extra: {bad_added[:8]}")
-    if not added:
+    # extra was appended after the original keys. Once main includes it, `added`
+    # is empty; the section still has to be present, and the leaf list below still matches.
+    if "extra" not in data:
         problems.append("missing extra section")
 
     old_leaves = dict(leaves(baseline))

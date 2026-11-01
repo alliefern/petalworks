@@ -1,7 +1,7 @@
 /**
- * Player-facing text. Everything the copy pass covers comes from docs/content/copy.json
- * (final, owned by the producer). Keys copy.json does not have yet live in EXTRA below,
- * keyed the same way, so they can move into copy.json without touching components.
+ * Player-facing text from docs/content/copy.json (final, owned by the producer).
+ * Leftover UI strings are copy.json `extra`. EXTRA_FALLBACK is used only when a key
+ * is missing, and that miss is reported with a console warning.
  * American English, normal capitalization.
  */
 import copy from '../../docs/content/copy.json';
@@ -80,8 +80,40 @@ export function blockCopy(reason: BlockReason, opts: { item?: ItemKind | null; t
   }
 }
 
-/** Strings copy.json does not cover yet. Same key style; see producer/QUESTIONS.md. */
-export const EXTRA = {
+/**
+ * Fill `fallback` from copy.json. A missing key keeps the built-in string and warns,
+ * so a dropped key shows up in the console and in src/ui/strings.test.ts.
+ */
+export function mergeExtra<T>(fallback: T, source: unknown, path = 'extra'): T {
+  if (typeof fallback === 'string') {
+    if (typeof source === 'string') return source as T;
+    console.warn(`copy.json extra is missing "${path}". Using the built-in fallback.`);
+    return fallback;
+  }
+  if (Array.isArray(fallback)) {
+    if (!Array.isArray(source)) {
+      console.warn(`copy.json extra is missing "${path}". Using the built-in fallback.`);
+      return fallback;
+    }
+    return fallback.map((item, index) => mergeExtra(item, source[index], `${path}[${index}]`)) as T;
+  }
+  if (fallback !== null && typeof fallback === 'object') {
+    if (source === null || typeof source !== 'object' || Array.isArray(source)) {
+      console.warn(`copy.json extra is missing "${path}". Using the built-in fallback.`);
+      return fallback;
+    }
+    const record = source as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(fallback)) {
+      out[key] = mergeExtra((fallback as Record<string, unknown>)[key], record[key], `${path}.${key}`);
+    }
+    return out as T;
+  }
+  return fallback;
+}
+
+/** Built-in leftovers, used only when copy.json `extra` lacks that key. */
+export const EXTRA_FALLBACK = {
   settings: {
     paused: 'The garden is paused while this is open.',
     soundHelp: 'Taps, pops, and chimes.',
@@ -191,3 +223,6 @@ export const EXTRA = {
     ['H', 'Tips'],
   ] as const,
 };
+
+/** Leftover UI strings. copy.json `extra` wins; a missing key keeps EXTRA_FALLBACK. */
+export const EXTRA = mergeExtra(EXTRA_FALLBACK, copy.extra);
