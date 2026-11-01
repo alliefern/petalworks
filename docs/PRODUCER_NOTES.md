@@ -22,3 +22,6 @@ These notes add to the brief. Where they conflict, these win.
 - After Phase 1 (visual proof), save screenshots to `producer/shots/` (use Playwright headless), update STATUS.md, commit, then continue straight into Phase 2. Do not stop and wait.
 - Phase 2 end = first playable milestone. Save screenshots, write `producer/PLAYTEST.md` with exact steps to run it and what to try, commit.
 - Keep going through Phases 3 and 4 unless told otherwise.
+
+## Capitalization (decided by Allie, 1 Nov 2026)
+All player-facing text in the game uses normal sentence/title capitalization, not all-lowercase. American English. This applies to docs/content/ copy, UI labels, orders and tooltips.

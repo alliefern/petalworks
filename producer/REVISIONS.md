@@ -19,3 +19,6 @@ Four docs-only PRs are merged and in main (merged with your local commits, nothi
 - `docs/content/copy.json` + `COPY.md` — first-pass player-facing text. **Don't wire it in yet.** I still have to edit it for voice and Allie is deciding capitalization. Keep your own placeholder strings in one place (a strings module keyed like copy.json) so swapping is one step.
 - `qa/ACCEPTANCE_TEST_PLAN.md` — the acceptance checks I'll run when you claim a phase done. Worth reading so nothing surprises you.
 - `docs/research/DEPLOY_AND_PACKAGING.md` — Vercel notes (asset paths/`base`, caching, ogg+mp3). Follow it when you set up the build so it deploys as a static site with relative asset paths.
+
+## 2026-11-01 16:01 UK: capitalization decided
+Allie decided in-game text uses normal capitalization (not all lowercase). See docs/PRODUCER_NOTES.md. Use normal capitalization for any UI strings you write. The producer will do a final copy pass on docs/content/ before you wire it in.
