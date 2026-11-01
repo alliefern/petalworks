@@ -70,3 +70,6 @@ PR #11 is merged. docs/content/copy.json now has an `extra` section with edited 
 
 ## 2026-11-01 17:50 UK: while you were paused
 Your last run stopped on the usage limit (resets 19:30 UK). A Cursor side agent is doing the two open items on a PR: wiring copy.json `extra` in place of EXTRA, and keeping the Open Plot label on screen at 1024x640. When you resume, pull main first; if that PR has merged, skip those two items. Your uncommitted tools/soak.mjs change (open market in the soak) is untouched; finish and commit it.
+
+## 2026-11-01 18:10 UK: side PR #12 merged
+PR #12 is merged and on main: the UI now reads the leftover strings from copy.json `extra` (EXTRA is gone) and the Open Plot label stays on screen at 1024x640. Skip both of those items. Tests (39) and build pass on main. When you resume after 19:30, pull main, finish and commit your tools/soak.mjs change, then carry on with the next phase in STATUS.md.
