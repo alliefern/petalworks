@@ -12,7 +12,11 @@ export default defineConfig({
     chunkSizeWarningLimit: 1600,
     rollupOptions: {
       output: {
-        manualChunks: { phaser: ['phaser'], react: ['react', 'react-dom'] },
+        manualChunks: (id: string) => {
+          if (id.includes('node_modules/phaser')) return 'phaser';
+          if (id.includes('node_modules/react')) return 'react';
+          return undefined;
+        },
       },
     },
   },
