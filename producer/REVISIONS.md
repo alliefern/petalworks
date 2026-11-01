@@ -58,3 +58,9 @@ Codex finished. All decor_*, fx_* and ui_* sprites are now in assets/art/ (187 t
 - The game is now on Vercel, deploying from GitHub main on every push (project "petalworks", protected by Allie's Vercel login). Keep `npm run build` producing `dist/`, and commit + push your current work and the untracked decor_/fx_/ui_ art soon, so the live build gets it.
 - 04-all-machines.png: toasts are fixed (one at a time), good. Still to do: (1) the buildings still read small against a mostly empty lawn; frame the yard tighter by default (Fit to the used area plus a margin, or zoom in a step) so a first chain fills more of the screen; (2) the locked expansion area east of the hedge reads as a grid of separate hedge boxes; show it as one soft, faded locked field with a single "Open Plot, 100" label; (3) the Tip card's left edge overlaps the hedge at 1024 width; check 1024×640 and 1280×800 so no card covers playable tiles.
 - Allie is redesigning the art herself; her files will replace Codex's under the same names (see docs/ART_LIST.md). Keep loading art strictly by file name through the manifest, with no size or frame-count assumptions beyond ASSET_SPECS, so her drop-in works.
+
+## 2026-11-01 17:30 UK: review of screenshots 02 and 12
+- 02 (first chain at 1024 wide) looks good: the chain fills the screen and nothing covers it.
+- 12 (1024×640): the view shows the whole yard and the bed and station are tiny. If that's the default framing at this size, apply the same used-area framing there. If it's after pressing Fit, that's fine.
+- 12: the "Open Plot · This costs 100 coins." label is clipped at the right edge of the window and sits under the order card. Keep it on screen (clamp it inside the viewport, clear of the side cards) or hide it when its anchor is off screen.
+- Pushing is handled by the producer; ignore the push blocker.
