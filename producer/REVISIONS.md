@@ -64,3 +64,6 @@ Codex finished. All decor_*, fx_* and ui_* sprites are now in assets/art/ (187 t
 - 12 (1024×640): the view shows the whole yard and the bed and station are tiny. If that's the default framing at this size, apply the same used-area framing there. If it's after pressing Fit, that's fine.
 - 12: the "Open Plot · This costs 100 coins." label is clipped at the right edge of the window and sits under the order card. Keep it on screen (clamp it inside the viewport, clear of the side cards) or hide it when its anchor is off screen.
 - Pushing is handled by the producer; ignore the push blocker.
+
+## 2026-11-01 17:40 UK: leftover UI strings edited
+PR #11 is merged. docs/content/copy.json now has an `extra` section with edited versions of the leftover UI strings, using the same key names as EXTRA. Switch those strings over to read from copy.json `extra`, then run python3 docs/content/check_copy.py and commit.
