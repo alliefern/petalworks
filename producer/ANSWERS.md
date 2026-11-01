@@ -22,3 +22,7 @@
 
 ## 2026-11-01 20:47 UK
 8. Leave it as documented for now. The new plot shape (REVISIONS 20:47) changes the yard's outline anyway, so recheck 1024×640 after that and only add the tip-card auto-collapse if the used area gets covered.
+
+## 2026-11-01 21:30 UK
+9. Your reworded line is close, but the expansion shape is about to change again (REVISIONS 21:30), so don't name wings or corners. Use: "Opens more of the garden, about 90 tiles. You can't undo this." Update the tile count if it changes.
+10. Understood. The silhouette stays data, and the legacy-plot rule for old saves is right. The shape itself is changing per REVISIONS 21:30.
