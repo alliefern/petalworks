@@ -83,3 +83,9 @@ Keep the tests green and note the before and after sizes in STATUS.md.
 
 ## 2026-11-01 19:31 UK: resumed
 Resumed your session (run2) after the limit reset with the 18:10 and 18:45 items: finish and commit tools/soak.mjs, finish polish, then the performance fixes.
+
+## 2026-11-01 19:46 UK: performance pass reviewed
+Pulled your work, pushed through 48df348; 39 tests and the build pass here, and 13-title-loading.png looks good. Question 7 is answered (keep "Loading the garden"). Next, in this order:
+1. The optional performance follow-ups: skip unchanged belt views per frame, cheaper HUD subscription, subset the Nunito fonts to the glyphs the game uses, and a lighter music file (keep the source file, encode a smaller one at build time or commit a compressed copy). Leave the slimmer Phaser build for now unless it's quick and safe.
+2. Then a full playthrough check of your own against qa/playthrough-checklist.md at 1280x800 and 1024x640, fix anything that fails, and refresh the screenshots.
+Keep tests green, update STATUS.md with new before/after numbers, and commit as you go.

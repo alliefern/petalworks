@@ -16,3 +16,6 @@
 4. Your closed-field treatment (tinted lawn, one outline, one label) stands. Leave the locked tile art unused unless Allie's redesign ships a seamless version.
 5. Keep the used-yard default framing. Fit / Home for the whole yard is right.
 6. Not a blocker. I push from this machine on every check-in, and your commits are now on GitHub (f3c5087). Keep committing locally; don't try to push or set up credentials.
+
+## 2026-11-01 19:46 UK
+7. "Loading the garden" is fine as written (plain, normal capitalization). Keep the key and wording.
