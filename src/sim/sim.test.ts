@@ -377,7 +377,7 @@ describe('orders and economy', () => {
     sim.world.coins = EXPANSION_COST;
     expect(sim.dispatch({ type: 'expand' }).ok).toBe(true);
     expect(sim.world.cols).toBe(20);
-    expect(sim.world.rows).toBe(15);
+    expect(sim.world.rows).toBe(16);
     expect(sim.world.unlockedPlotIds).toEqual(['potting', 'south-rim']);
     expect(sim.world.coins).toBe(0);
     expect(sim.dispatch({ type: 'place', kind: 'belt', x: 18, y: 13, facing: E }).error).toBe('unaffordable');

@@ -13,6 +13,7 @@ import { placeLabelInView, type ScreenBox } from './labelPlace';
 import { DISC_SIZE, makeOverlayTextures } from './overlays';
 import { beltProgressT, itemPositionOnBelt, tileCenter } from './paths';
 import { SpriteRegistry } from './sprites';
+import { offset, organicOutline, resample } from './outline';
 import { COPY, fmt } from '../ui/strings';
 
 interface StructureView {
@@ -172,138 +173,130 @@ export class PetalScene extends Phaser.Scene {
     };
     const open = (x: number, y: number) => isOpenTile(world, x, y);
     const openTiles = tilesOf(world.unlockedPlotIds);
-    for (const { x, y } of openTiles) {
+    const openSet = new Set(openTiles.map((t) => `${t.x},${t.y}`));
+
+    // Closed plots (the expansion before it is bought).
+    const closedTiles: Array<{ x: number; y: number; cost: number }> = [];
+    if (showLocked) {
+      for (const p of PLOTS) {
+        if (!p.purchasable || world.unlockedPlotIds.includes(p.id)) continue;
+        for (const t of tilesOf([p.id])) if (!open(t.x, t.y)) closedTiles.push({ ...t, cost: p.cost });
+      }
+    }
+    const closedSet = new Set(closedTiles.map((t) => `${t.x},${t.y}`));
+
+    // Lawn: every open tile, every closed-preview tile, and a one-tile apron around them
+    // that the border fade will blend into the surroundings.
+    const lawn = new Set<string>();
+    for (const k of [...openSet, ...closedSet]) {
+      const [x, y] = k.split(',').map(Number);
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) lawn.add(`${x + dx},${y + dy}`);
+    }
+    for (const k of lawn) {
+      const [x, y] = k.split(',').map(Number);
       const r = seeded(x, y);
       put(`ground.grass.${r < 0.72 ? 0 : r < 0.84 ? 1 : r < 0.94 ? 2 : 3}`, x, y);
     }
 
-    // Closed plots: plain lawn under a soft moss tint, one traced outline around the
-    // closed region, and one label, so the player sees exactly what Open Plot adds.
-    // (The per-tile ground.locked art carries its own border; see producer/QUESTIONS.md.)
-    const closedSet = new Set<string>();
-    if (showLocked) {
-      for (const p of PLOTS) {
-        if (!p.purchasable || world.unlockedPlotIds.includes(p.id)) continue;
-        const closed = tilesOf([p.id]).filter((t) => !open(t.x, t.y));
-        for (const t of closed) closedSet.add(`${t.x},${t.y}`);
-        const g = this.add.graphics().setDepth(DEPTH.ground + 0.6);
-        g.fillStyle(COLORS.moss, 0.28);
-        let cx = 0;
-        let cy = 0;
-        for (const t of closed) {
-          const r = seeded(t.x + 7, t.y + 3);
-          put(`ground.grass.${r < 0.8 ? 0 : 1}`, t.x, t.y);
-          g.fillRect(t.x * TILE, t.y * TILE, TILE + 1, TILE + 1);
-          cx += t.x + 0.5;
-          cy += t.y + 0.5;
+    // The organic border: traced around the open tiles, smoothed and wobbled, pushed a
+    // little outward so the curve clears the buildable tiles' corners.
+    const loops = organicOutline(openTiles, TILE, 7).map((l) => offset(l, TILE * 0.12));
+    const fade = this.add.graphics().setDepth(DEPTH.ground + 0.3);
+    const border = this.add.graphics().setDepth(DEPTH.ground + 0.5);
+    for (const loop of loops) {
+      // Soft fade from the border out to about a tile: rings between successive outward
+      // offsets, each a little more linen, so the lawn melts into the surroundings.
+      const steps = 8;
+      const reach = TILE * 1.1;
+      let prev = loop;
+      for (let i = 1; i <= steps; i++) {
+        const next = offset(loop, (reach * i) / steps);
+        fade.fillStyle(COLORS.linen, Math.min(1, 0.1 + (i / steps) ** 1.4 * 0.95));
+        for (let j = 0; j < loop.length; j++) {
+          const a = prev[j];
+          const b = prev[(j + 1) % loop.length];
+          const c = next[(j + 1) % loop.length];
+          const d = next[j];
+          fade.fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y);
+          fade.fillTriangle(a.x, a.y, c.x, c.y, d.x, d.y);
         }
-        // Outline: every tile edge between a closed tile and a not-closed tile.
-        g.lineStyle(3, 0xc9a978, 0.9);
-        const inClosed = (x: number, y: number) => closedSet.has(`${x},${y}`);
-        for (const t of closed) {
-          const x0 = t.x * TILE + 2;
-          const y0 = t.y * TILE + 2;
-          const x1 = (t.x + 1) * TILE - 2;
-          const y1 = (t.y + 1) * TILE - 2;
-          if (!inClosed(t.x, t.y - 1)) g.lineBetween(x0 - 4, y0, x1 + 4, y0);
-          if (!inClosed(t.x, t.y + 1)) g.lineBetween(x0 - 4, y1, x1 + 4, y1);
-          if (!inClosed(t.x - 1, t.y)) g.lineBetween(x0, y0 - 4, x0, y1 + 4);
-          if (!inClosed(t.x + 1, t.y)) g.lineBetween(x1, y0 - 4, x1, y1 + 4);
-        }
-        this.lockedGfx.push(g);
-        if (closed.length) {
-          // Label on the closed tile nearest the region's centroid.
-          cx /= closed.length;
-          cy /= closed.length;
-          let best = closed[0];
-          let bd = Infinity;
-          for (const t of closed) {
-            const d = (t.x + 0.5 - cx) ** 2 + (t.y + 0.5 - cy) ** 2;
-            if (d < bd) {
-              bd = d;
-              best = t;
-            }
-          }
-          const lx = (best.x + 0.5) * TILE;
-          const ly = (best.y + 0.5) * TILE;
-          const label = this.add
-            .text(lx, ly, `${COPY.expansion.button}\n${fmt(COPY.expansion.confirmCost, { cost: p.cost })}`, {
-              fontFamily: 'Nunito, "Segoe UI", sans-serif',
-              fontSize: '18px',
-              fontStyle: '800',
-              color: '#39463b',
-              align: 'center',
-              backgroundColor: 'rgba(246,235,213,0.9)',
-              padding: { x: 12, y: 8 },
-            })
-            .setOrigin(0.5)
-            .setDepth(DEPTH.ground + 0.7);
-          label.setData('homeX', lx);
-          label.setData('homeY', ly);
-          this.lockedText.push(label);
+        prev = next;
+      }
+      // One continuous painted border: a soft glow, the line, and a thin cream highlight.
+      border.lineStyle(14, COLORS.cream, 0.28);
+      border.strokePoints(loop, true, true);
+      border.lineStyle(4.5, 0x4f6345, 0.95);
+      border.strokePoints(loop, true, true);
+      border.lineStyle(1.5, COLORS.cream, 0.45);
+      border.strokePoints(offset(loop, -2.5), true, true);
+      // Hedge: foliage chunks of the hedge art planted along the curve just outside the line.
+      const path = offset(loop, TILE * 0.3);
+      const spacing = TILE * 0.5;
+      const pts = resample(path, spacing);
+      pts.forEach((p, i) => {
+        const q = pts[(i + 1) % pts.length];
+        const ang = Math.atan2(q.y - p.y, q.x - p.x);
+        const r = seeded(i, 99);
+        const im = this.img(p.x, p.y, 'edge.hedge.n').setDepth(DEPTH.ground + 0.8 + (r < 0.5 ? 0 : 0.01));
+        im.setCrop(Math.floor(r * 60), 0, 68, 74);
+        im.setDisplaySize(128, 128); // native 2x art; crop keeps a 34×37 CSS px chunk
+        im.setScale((0.46 + r * 0.14) * (TILE / 128) * 1.6);
+        im.setRotation(ang + Math.PI / 2 * (seeded(i, 5) < 0.5 ? 1 : -1) * 0 + (seeded(i, 11) - 0.5) * 0.6);
+        this.ground.push(im);
+      });
+    }
+    this.lockedGfx.push(fade, border);
+
+    // Closed field preview: a tint, the future border as a dotted kraft curve, and one
+    // label placed on the closed tile farthest from the field's own edge so it fits inside.
+    if (closedTiles.length) {
+      const tint = this.add.graphics().setDepth(DEPTH.ground + 0.35);
+      tint.fillStyle(COLORS.moss, 0.26);
+      for (const t of closedTiles) tint.fillRect(t.x * TILE, t.y * TILE, TILE + 1, TILE + 1);
+      const future = organicOutline([...openTiles, ...closedTiles], TILE, 7).map((l) => offset(l, TILE * 0.12));
+      for (const loop of future) {
+        const pts = resample(loop, 10);
+        tint.lineStyle(3, 0xc9a978, 0.9);
+        for (let i = 0; i < pts.length; i += 2) {
+          const a = pts[i];
+          const b = pts[(i + 1) % pts.length];
+          tint.lineBetween(a.x, a.y, b.x, b.y);
         }
       }
+      this.lockedGfx.push(tint);
+      let best = closedTiles[0];
+      let bestD = -1;
+      for (const t of closedTiles) {
+        // Chebyshev distance to the nearest tile that is not part of the closed field.
+        let d = 0;
+        outer: for (d = 1; d < 6; d++) {
+          for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) if (!closedSet.has(`${t.x + dx},${t.y + dy}`)) break outer;
+        }
+        if (d > bestD) {
+          bestD = d;
+          best = t;
+        }
+      }
+      const lx = (best.x + 0.5) * TILE;
+      const ly = (best.y + 0.5) * TILE;
+      const label = this.add
+        .text(lx, ly, `${COPY.expansion.button}\n${fmt(COPY.expansion.confirmCost, { cost: best.cost })}`, {
+          fontFamily: 'Nunito, "Segoe UI", sans-serif',
+          fontSize: '15px',
+          fontStyle: '800',
+          color: '#39463b',
+          align: 'center',
+          backgroundColor: 'rgba(246,235,213,0.92)',
+          padding: { x: 10, y: 6 },
+        })
+        .setOrigin(0.5)
+        .setDepth(DEPTH.ground + 0.9);
+      label.setData('homeX', lx);
+      label.setData('homeY', ly);
+      this.lockedText.push(label);
     }
 
-    // Hedge: every closed tile that touches an open tile gets a piece that faces the lawn.
-    // Strips face one open side; the four L pieces serve outer corners (an open tile on the
-    // diagonal only). Inner corners (open tiles on two sides of a notch) are the two strips
-    // cropped to their meeting square, so the band turns instead of crossing itself.
-    // The hedge art has transparent lawn under the foliage, so grass goes beneath it.
-    const hedge = (piece: string, x: number, y: number, crop?: [number, number, number, number]) => {
-      if (!closedSet.has(`${x},${y}`)) put(`ground.grass.${(x * 7 + y * 3) % 2 === 0 ? 0 : 1}`, x, y, DEPTH.ground);
-      const im = put(`edge.hedge.${piece}`, x, y, DEPTH.ground + 0.8);
-      if (crop) {
-        // Crop is in source pixels of the 128 px piece; the hedge fills 77 px of its side.
-        const [cx, cy, cw, ch] = crop;
-        im.setCrop(cx, cy, cw, ch);
-      }
-    };
-    const SRC = 128;
-    const BAND = 77;
-    const ring = new Set<string>();
-    for (const { x, y } of openTiles) {
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && !open(x + dx, y + dy)) ring.add(`${x + dx},${y + dy}`);
-    }
-    for (const k of ring) {
-      const [x, y] = k.split(',').map(Number);
-      const n = open(x, y - 1);
-      const s = open(x, y + 1);
-      const e = open(x + 1, y);
-      const w = open(x - 1, y);
-      let piece: string | null = null;
-      if (s && e) {
-        hedge('n', x, y, [0, 0, BAND, SRC]);
-        hedge('w', x, y, [0, 0, SRC, BAND]);
-        continue;
-      }
-      if (s && w) {
-        hedge('n', x, y, [SRC - BAND, 0, BAND, SRC]);
-        hedge('e', x, y, [0, 0, SRC, BAND]);
-        continue;
-      }
-      if (n && e) {
-        hedge('s', x, y, [0, 0, BAND, SRC]);
-        hedge('w', x, y, [0, SRC - BAND, SRC, BAND]);
-        continue;
-      }
-      if (n && w) {
-        hedge('s', x, y, [SRC - BAND, 0, BAND, SRC]);
-        hedge('e', x, y, [0, SRC - BAND, SRC, BAND]);
-        continue;
-      }
-      if (s) piece = 'n';
-      else if (n) piece = 's';
-      else if (e) piece = 'w';
-      else if (w) piece = 'e';
-      else if (open(x + 1, y + 1)) piece = 'nw';
-      else if (open(x - 1, y + 1)) piece = 'ne';
-      else if (open(x + 1, y - 1)) piece = 'sw';
-      else if (open(x - 1, y - 1)) piece = 'se';
-      if (piece) hedge(piece, x, y);
-    }
-
-    // Decorative accents on open lawn, plus props resting in the notches.
+    // Decorative accents on open lawn, plus props resting just outside the border.
     const decor: Array<[string, number, number, number]> = [
       ['decor.wildflower.0', 3, 2, 0.5],
       ['decor.tuft.0', 12, 3, 0.5],
@@ -318,14 +311,13 @@ export class PetalScene extends Phaser.Scene {
       im.setDisplaySize(TILE * scale, TILE * scale);
       im.setPosition(x * TILE + TILE * 0.75, y * TILE + TILE * 0.3);
     }
-    // Props sit on the hedge-free tiles of the notches.
-    if (!open(15, 0) && !ring.has('15,0')) {
-      const can = put('decor.watering_can', 15, 0, DEPTH.decor + 1, 0.9);
-      can.setPosition(15 * TILE + TILE * 0.5, 0 * TILE + TILE * 0.5);
-    }
-    if (!open(0, 0) && !ring.has('0,0')) {
-      const pots = put('decor.terracotta', 0, 0, DEPTH.decor + 1, 0.85);
-      pots.setPosition(0 * TILE + TILE * 0.5, 0 * TILE + TILE * 0.5);
+    for (const [k, x, y, sc] of [
+      ['decor.terracotta', 0, 1, 0.85],
+      ['decor.watering_can', 16, 5, 0.9],
+    ] as Array<[string, number, number, number]>) {
+      if (open(x, y) || closedSet.has(`${x},${y}`)) continue;
+      const im = put(k, x, y, DEPTH.decor + 1, sc);
+      im.setPosition((x + 0.5) * TILE, (y + 0.5) * TILE);
     }
     this.camCtl.setWorldSize(world.cols, world.rows);
   }

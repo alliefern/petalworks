@@ -166,7 +166,7 @@ export const EXTRA_FALLBACK = {
     placeItem: 'Place {item}',
     needsBelt: 'needs an empty belt',
     dropHere: 'click to drop it on this belt',
-    expandLine: 'Opens an east wing and a south corner, about 90 more tiles. Permanent.',
+    expandLine: "Opens more of the garden, about 90 tiles. You can't undo this.",
   },
   blocked: {
     headOn: 'The belt ahead points back at this one. Turn one of them.',

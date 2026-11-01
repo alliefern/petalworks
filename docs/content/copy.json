@@ -576,7 +576,7 @@
       "placeItem": "Place {item}",
       "needsBelt": "Needs an empty belt.",
       "dropHere": "Click to drop it on this belt.",
-      "expandLine": "The garden grows to 20 by 14 tiles."
+      "expandLine": "Opens more of the garden, about 90 tiles. You can't undo this."
     },
     "blocked": {
       "headOn": "The belt ahead points back at this one, so turn one of them.",

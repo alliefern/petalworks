@@ -142,3 +142,13 @@ Then do the 21:13 and 21:15 items in this order: belts (1), overlap on big scree
 
 ## 21:48 UK: run6 stalled
 Run6 stopped producing output at 21:34 mid-thought (outline.ts and outline.test.ts written but uncommitted). Stopped it and resumed as run7 with the same instructions.
+
+## 22:05 UK — producer review of run7 work (run7 stalled at 21:52)
+Run7 stalled again after reading screenshots (no output 12+ min, no CPU). I killed it and committed its work as a checkpoint (49 tests and tsc pass) so nothing is lost.
+Plot review from shot 15:
+- The border is now a smooth curve. Good, that's the right direction.
+- The overall shape still reads as a rounded rectangle. Make it lumpier and less symmetric, like Northgard: a couple of deeper bays and bulges along each side, not just notched corners.
+- There are stray dark-green triangle shapes poking out beyond the hedge (top-left near the plant pot, left edge around y=240, bottom-right corner). These look like leftover stepped-tile edge pieces. Remove them so only the smooth hedge line shows.
+- Check the Open Plot label isn't clipped (item 3 from 21:30).
+Then carry on with the playtest items in order: belts, machine overlap on big screens, placement preview size, sound toggle and volume sliders, responsive layout 1024 to 4K.
+To avoid stalls: commit after each finished step, and keep screenshot reviews to one or two images at a time.

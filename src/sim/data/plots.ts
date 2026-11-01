@@ -2,57 +2,72 @@ import type { PlotDef, Rect } from '../types';
 
 /**
  * Garden plots. Coordinates are absolute with a fixed northwest origin, so opening a
- * plot never moves anything already built. A plot is a union of rectangles; a tile is
- * buildable if any open plot covers it. Shapes are deliberately not boxes: the starting
- * yard has stepped corners, a south alcove and an east nook, and the expansion is an
- * L-shaped wing with a north-east nook rather than a uniform rim.
+ * plot never moves anything already built. A plot is a union of rectangles (built here
+ * from an ASCII mask, one rect per run of `#`); a tile is buildable if any open plot
+ * covers it. Gameplay stays on the tile grid; the renderer draws a smooth, wobbly border
+ * around the open tiles (src/game/outline.ts), so the mask only needs to be lumpy, not pretty.
  *
- * Tile map (`#` potting, `+` added by the expansion, `.` never open):
- *
- *      0         1
- *      01234567890123456789
- *   0  ..############++++++
- *   1  ..############++++++
- *   2  ################++..
- *   3  ################++..
- *   4  ################++..
- *   5  ################++++
- *   6  ################++++
- *   7  ################++++
- *   8  ################++++
- *   9  ################++++
- *  10  ++############++++++
- *  11  ++############++++++
- *  12  ++++++####++++++++++
- *  13  ++++++####++++++++++
- *  14  ..........++++++++++
+ * Masks are 20 wide; row 0 is the top. `#` is in the plot, `.` is not.
  */
+const POTTING_MASK = [
+  '......######........', // 0   a small lump at the top
+  '....##########......', // 1
+  '..##############....', // 2
+  '.################...', // 3
+  '.#################..', // 4
+  '###############.....', // 5   inlet on the east side
+  '###############.....', // 6   (packing station sits at 13,6)
+  '##################..', // 7
+  '..################..', // 8   inlet on the west side
+  '..###############...', // 9
+  '.################...', // 10  bulge back out
+  '...############.....', // 11
+  '.....#########......', // 12
+  '.......######.......', // 13  a soft lump at the bottom
+];
+
+/** The expansion grows the same blob outward: it fills the two inlets and adds lobes. */
+const SOUTH_RIM_MASK = [
+  '..............###...', // 0
+  '..............####..', // 1
+  '................##..', // 2
+  '.................##.', // 3
+  '..................##', // 4
+  '...............#####', // 5   fills the east inlet
+  '...............#####', // 6
+  '..................##', // 7
+  '##................##', // 8   fills the west inlet
+  '##...............###', // 9
+  '#................###', // 10
+  '.##............#####', // 11
+  '.####.........######', // 12
+  '..#####......#######', // 13
+  '....#########.#####.', // 14
+  '......######........', // 15
+];
+
+export function rectsFromMask(rows: string[], ox = 0, oy = 0): Rect[] {
+  const rects: Rect[] = [];
+  rows.forEach((row, y) => {
+    let x = 0;
+    while (x < row.length) {
+      if (row[x] !== '#') {
+        x++;
+        continue;
+      }
+      const start = x;
+      while (x < row.length && row[x] === '#') x++;
+      rects.push({ x: ox + start, y: oy + y, w: x - start, h: 1 });
+    }
+  });
+  return rects;
+}
+
 export const PLOTS: PlotDef[] = [
-  {
-    id: 'potting',
-    rects: [
-      { x: 0, y: 2, w: 16, h: 8 }, // wide band
-      { x: 2, y: 0, w: 12, h: 12 }, // tall band (the two bands make the stepped corners)
-      { x: 6, y: 12, w: 4, h: 2 }, // south alcove
-      { x: 16, y: 2, w: 2, h: 3 }, // east nook
-    ],
-    cost: 0,
-    purchasable: false,
-  },
-  {
-    id: 'south-rim',
-    rects: [
-      { x: 16, y: 5, w: 4, h: 5 }, // east wing
-      { x: 14, y: 10, w: 6, h: 2 }, // wing's foot (also fills the old south-east notch)
-      { x: 10, y: 12, w: 10, h: 3 }, // south-east corner
-      { x: 0, y: 10, w: 6, h: 4 }, // south-west step
-      { x: 14, y: 0, w: 6, h: 2 }, // north-east nook
-    ],
-    cost: 100,
-    purchasable: true,
-  },
+  { id: 'potting', rects: rectsFromMask(POTTING_MASK), cost: 0, purchasable: false },
+  { id: 'south-rim', rects: rectsFromMask(SOUTH_RIM_MASK), cost: 100, purchasable: true },
   // Not purchasable: added on load for saves made when the yard was a plain 16×12 box
-  // (and its 20×14 expansion), so anything built in a corner that is now a notch stays valid.
+  // (and its 20×14 expansion), so anything built in a corner that is now outside stays valid.
   { id: 'legacy-potting', rects: [{ x: 0, y: 0, w: 16, h: 12 }], cost: 0, purchasable: false },
   { id: 'legacy-south-rim', rects: [{ x: 0, y: 0, w: 20, h: 14 }], cost: 0, purchasable: false },
 ];
