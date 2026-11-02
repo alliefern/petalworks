@@ -224,6 +224,7 @@ export const EXTRA_FALLBACK = {
     ['= and -', 'Zoom'],
     ['Home', 'Fit the garden'],
     ['H', 'Tips'],
+    ['M', 'Sound on or off'],
   ] as const,
   sound: {
     musicVolume: 'Music volume',

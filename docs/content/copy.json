@@ -733,6 +733,10 @@
       [
         "H",
         "Open How to Play"
+      ],
+      [
+        "M",
+        "Sound on or off"
       ]
     ],
     "sound": {
