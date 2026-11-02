@@ -28,7 +28,7 @@ Starting timings, unless the design notes record a deliberate retune (write the 
 | Drying Bench | 2 lavender become 1 Lavender Sachet in 7 seconds |
 | Arrangement Table | 1 Daisy Bundle + 1 Lavender Sachet become 1 Mixed Bouquet in 8 seconds |
 
-Grid at the start: 16 by 12 buildable tiles, one structure per tile. One optional expansion, to 20 by 14, after a milestone. It is not required to finish the six orders.
+Yard at the start: an irregular garden plot of about 180 buildable tiles (it sits inside a 20 by 14 box, with bays and bulges, and a hedge along its real edge), one structure per tile. One optional expansion, Open Plot, adds about 90 more tiles along the same kind of curve after a milestone. It is not required to finish the six orders. The shape is data (`src/sim/data/plots.ts`); saves from the old 16 by 12 box keep every tile they built on.
 
 ## How to run a session
 
@@ -1009,19 +1009,19 @@ Read the removal rule in `DESIGN_DECISIONS.md` and write it on the record card. 
 
 ### 53. Grid bounds and expansion
 
-**Checks:** the 16×12 build area, and the optional one-time expansion to 20×14, without letting expansion trap you.
+**Checks:** the irregular starting plot (about 180 tiles inside a 20×14 box), and the optional one-time Open Plot expansion (about 90 more tiles), without letting expansion trap you.
 
-1. Count buildable tiles along the width and the height, or read the size if the UI shows it. Try to place past the last tile on each side.
+1. Follow the hedge around the yard. Try to place just outside it on each side, in a bay (an inlet of linen between two hedge runs), and on the closed field beyond the hedge if one is showing.
 2. If an expansion control exists, read its price and whether it is available in the sandbox. You should already have finished all six orders without it. If you have not bought it, decide from the price whether buying it now would have been a problem back in test 40.
 3. Buy it once if you can afford it without going broke. Try to buy it again. Count the new buildable size.
 4. Try to place on a still-locked plot if any remain.
 
 **Pass:**
 
-- The starting buildable area is 16 by 12. Clicks outside it are refused with the same kind of feedback as test 17.
+- The buildable area is exactly the lawn inside the hedge: an irregular shape of about 180 tiles, not a rectangle. Clicks outside the hedge, including in a bay, are refused with the same kind of feedback as test 17 ("That spot is outside the garden."), and clicks on the closed field say the plot is still closed.
 - All six orders were finishable without the expansion. If the expansion was offered earlier, its price was not the thing that made the bouquet chain unaffordable, or it was clearly optional and you could ignore it.
-- After you buy it, the buildable area is 20 by 14, coins drop by the shown price once, and a second purchase is not offered or is refused.
-- Locked plots, if any remain, reject placement and look distinct from buildable grass (the twine-edged fallow plot, or an equivalent you can tell apart without guessing).
+- After you buy it, the hedge moves out to the new curve and about 90 more tiles are buildable (the Open Plot label said about 90 and the price); coins drop by the shown price once; nothing you built moved; a second purchase is not offered or is refused.
+- The closed field, while it is closed, rejects placement and looks distinct from buildable grass (a tinted lawn with a dotted twine outline and one Open Plot label, no tile grid showing), and the ground beyond the hedge fades into the linen along a smooth curve with no square steps.
 
 ### 54. Refund policy
 
