@@ -88,6 +88,36 @@ describe('fresh world', () => {
     expect(Object.values(sim.world.structures).filter((x) => x.kind !== 'packing_station')).toHaveLength(0);
   });
 
+  it('refuses any placement on an occupied tile, next to buildings on every side', () => {
+    const sim = rich();
+    // A ring of beds and machines around one centre tile, every neighbour touching.
+    const ring: Array<[StructureKind, number, number]> = [
+      ['daisy_bed', 4, 4], ['bundling_table', 5, 4], ['daisy_bed', 6, 4],
+      ['drying_bench', 4, 5], ['bundling_table', 6, 5],
+      ['daisy_bed', 4, 6], ['drying_bench', 5, 6], ['daisy_bed', 6, 6],
+    ];
+    for (const [k, x, y] of ring) place(sim, k, x, y);
+    const centreId = place(sim, 'bundling_table', 5, 5);
+    const before = Object.keys(sim.world.structures).length;
+    // Every kind, on every occupied tile, through both placement paths.
+    for (const [, x, y] of [...ring, ['bundling_table', 5, 5] as [StructureKind, number, number]]) {
+      for (const kind of ['daisy_bed', 'bundling_table', 'drying_bench', 'belt'] as StructureKind[]) {
+        expect(sim.canPlace(kind, x, y).error).toBe('occupied');
+        expect(sim.dispatch({ type: 'place', kind, x, y, facing: E }).error).toBe('occupied');
+      }
+    }
+    expect(sim.dispatch({ type: 'place_belt_path', tiles: [{ x: 5, y: 5 }] }).error).toBe('occupied');
+    // A dragged belt path through the block skips the full tiles and keeps the buildings.
+    const r = sim.dispatch({ type: 'place_belt_path', tiles: [3, 4, 5, 6, 7].map((x) => ({ x, y: 5 })) });
+    expect(r.ok).toBe(true);
+    expect(r.ids).toHaveLength(2);
+    expect(sim.at(5, 5)!.id).toBe(centreId);
+    expect(sim.at(4, 5)!.kind).toBe('drying_bench');
+    expect(sim.at(3, 5)!.kind).toBe('belt');
+    expect(sim.at(7, 5)!.kind).toBe('belt');
+    expect(Object.keys(sim.world.structures).length).toBe(before + 2);
+  });
+
   it('rejects out-of-bounds and occupied tiles', () => {
     const sim = rich();
     place(sim, 'daisy_bed', 2, 2);
