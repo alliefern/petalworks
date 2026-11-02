@@ -1,7 +1,7 @@
 # Status
 
 **Phase:** Phases 1–3 complete · Phase 4 polish done for this pass · final art and final copy wired
-**Last updated:** Nov 2, 2026 (early morning)
+**Last updated:** Nov 2, 2026 (03:40 UK)
 
 ## What works right now (plain English)
 - Start a garden, read Nell's order, plant a Daisy Bed, drag belts to the crate, watch daisies ride in, get paid, unlock the next tool. All six orders work end to end, then the market opens (goods sell on arrival, every tool available).
@@ -13,6 +13,37 @@
 - Full keyboard play, dialogs trap focus, one reduced-motion flag, sound/music toggles persist. The real sound set is wired.
 - Autosave, Continue / New Game with confirmation, corrupted-save backup, schema v2 with a v1 migration.
 - Default zoom keeps tiles at least 48 px; at 1366×768 the garden sits between the tip card and the order card instead of under them; the fit re-runs on window resize (Steam-plan guardrail).
+
+## Round of Nov 2, 03:40 (QA walk: accessibility checklist and the acceptance plan)
+Everything below ran against the current build with the tools in `tools/`, each run after the last code change. "Scripted" means a tool checks it on every run.
+
+### qa/accessibility-checklist.md
+`tools/a11ycheck.mjs` scripts 84 checks from the sheet; all pass. The three things it found are fixed in their own commits:
+- Player text was under the ACCESSIBILITY §5 sizes (order panel lines, inspector body, tip card, settings help, palette names at 14 to 15 px; small caps at 12 px). Body text is now 16 px and the small caps sit on the 14 px floor.
+- Top-bar buttons were 40 px tall and the speed buttons 43 px wide; now 44 px or more.
+- At 200% browser zoom the top bar clipped off the right edge; it now wraps to a second row and the side cards start below it.
+- The valid-placement ring was a sage stroke on sage grass and vanished in grayscale; it is now cream with an ink hairline and heavier brackets (checked on a grayscale sheet of the rings, discs, badges, items and bed states).
+
+| Section | Result | How it was checked |
+| --- | --- | --- |
+| State and contrast | Pass | Scripted: coins, order, tip, top bar and inspector text are dark ink on cream at 7:1 or better; blocked shows the ! disc, the badge and a sentence with the reason; waiting names the missing daisies with the … disc; ready says Ready; the four discs and three placement shapes are distinct drawings; a closed plot and an outside tile refuse in words; the inspector gives the facing as a word. Grayscale sheet reviewed by eye: !, ×, check and … differ; daisy, lavender, bundle, sachet and bouquet differ; empty, sprouting, budding and blooming beds differ. |
+| Reduced motion | Pass | Scripted: one toggle with the "garden keeps going" line; flag set on the document; items still ride belts; chevrons hold still; survives reload. |
+| Keyboard | Pass | Scripted: Tab reaches pause, speeds, sound, undo, tips, settings, the build menu and the garden, each with a 2 px focus ring; arrows move the cursor; Enter places and charges once; R and Shift+R; Esc disarms; a belt path from Enter, arrows, Enter; Esc drops a path; Enter selects and the inspector shows status and facing; Delete, Z, X; P and F; Settings and the New Game confirm trap focus and Esc returns to the garden. |
+| Type and the laptop window | Pass | Scripted at 1366×768 and 1280×800: order and inspector text 16 px or more; every visible button at least 44×44 with a word or spoken label; default tiles 48 px or more with the build menu open. At 200% zoom the order sentence is whole and the top bar wraps. |
+| Sound | Pass | Scripted: no audio context before the first click; effects and music are separate flags with On and Off in words; both survive reload and New Game; a refused placement shows the sentence; a block shows one label and no repeating toasts. Not scripted: hearing each cue; the bloom and pop cues fire from the same events that swap the sprite. |
+| Later rows | n/a | Volume sliders now exist (Nov 2); remappable keys, high-contrast theme and caption history remain post-slice. |
+
+### qa/ACCEPTANCE_TEST_PLAN.md (59 tests)
+| Tests | Result | Evidence |
+| --- | --- | --- |
+| 1 to 5 (commands, dev server, build, unit tests, browser smoke) | Pass | `npm test` 58, `npm run build` clean with tsc, `npm run test:e2e` 6 of 6, `check_copy.py` passes. |
+| 6 to 13 (new game, silence first, art, layout, no character, wording, tutorial, no modals) | Pass | Playthrough script 29 of 29 at 1280×800 and 1024×640; a11y script (silence until the first click); `check_copy.py` rejects British spellings; layout script at five sizes; the order-complete card lets clicks through. First-launch look reviewed on screenshots 01, 18 and 19. |
+| 14 to 27 (tooltips, ghost, place, refusals, rotate, drag belts, pan and zoom, delete, undo, cancel, autosave, pause and speed, sound settings, every control) | Pass | Playthrough script (tooltip words and cost, ghost valid vs bad, place, rotate both ways, refused in words with coins unchanged, loaded-belt removal to the basket, undo after pay, pause freezes, 3× faster with one item per tile, settings survive reload, every HUD button clicks). Belt drags: `tools/beltloop.mjs` lays rings by dragging and checks one piece per tile. Pointer and zoom: `tools/pointercheck.mjs` at three sizes, two DPRs and three zooms. Sound cues by ear are not scripted. |
+| 28 to 45 (the six orders, reloads mid-transport and mid-craft, autosave, softlock budget, catalog lock, sandbox, completed save, console) | Pass | e2e: order 1 by mouse, all six orders, reload mid-game, completed save reloads into the sandbox; unit tests: every order from real chains, never unaffordable, catalog gating, packing never counts undelivered items; 90 s soak at 3× in the open market with no console errors. |
+| 46 to 55 (contested merge, head-on, remove with items, rotate loaded, very fast, hidden tab, CPU throttle, bounds and expansion, refunds, accessibility) | Pass | Unit tests: contested destination is deterministic and loses nothing; head-on refused; packed line moves as a unit; removal refunds belts 100% and buildings 75% and sends held items to the basket; rotating keeps the item; expansion gated and paid once; no duplication across a busy network. Soak at 3×. Hidden tab pauses the garden (DESIGN_DECISIONS, 250 ms cap). CPU throttle: at 4× slowdown the sim still runs 10.0 ticks a second (10.0 unthrottled). Accessibility: the sheet above. Note: the plan still says a 16×12 grid growing to 20×14; the yard is now the irregular plot the producer asked for (about 190 tiles, 90 more after Open Plot), and the bounds tests check that shape instead. |
+| 56 to 59 (broken save, New Game confirm, wasted budget, known limitations) | Pass | e2e: broken JSON, and a save from a newer version, explain themselves in plain words and offer New Game while keeping a backup; New Game asks first, Cancel keeps the garden across a reload, Confirm starts order 1 with 120 coins and the tips; unit: refunds let a wasted budget recover and cumulative rewards cover every order; KNOWN_ISSUES and DESIGN_DECISIONS state the removal, refund and hidden-tab rules. |
+
+Not covered by any script and still for a human: listening to each sound cue under its condition (plan 26 table), and the "looks painted and calm" judgement in plan 8.
 
 ## Round of Nov 2, 00:50 (Allie's playtest: belts, size jump, overlap)
 - **Belts fixed (playtest item 1).** Every placed building popped in with a scale tween that ended at scale 1, which is the raw 2x art, so each belt tile was drawn two tiles wide and the next tile's corner or straight piece showed on top of it ("straight and turning at the same time"). The pop-in now ends at the tile size, and the view sizes a building only after its real sprite is loaded. Each belt tile shows exactly one piece (straight, clockwise corner, counter-clockwise corner, or an end stop on a dead end) chosen from its neighbors by `src/game/beltPiece.ts`, which has a unit test for all four rotations of each piece, merges, and every feeder combination. `tools/beltloop.mjs` lays two rings by dragging (one each way), a side merge, a rotated belt and a removed mid-line belt, then checks every belt tile draws one 64 px piece. Screenshot 18 shows both loops.
