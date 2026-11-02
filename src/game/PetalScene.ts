@@ -678,8 +678,21 @@ export class PetalScene extends Phaser.Scene {
     }
   }
 
+  /** Cached HUD card boxes: layout reads inside the render loop are a cost, so they are refreshed only when the HUD state or window changes, or every half second. */
+  private cardCache: { key: string; at: number; boxes: ScreenBox[] } | null = null;
+
   /** HUD cards the closed-field label must not sit under. */
   private labelCards(): ScreenBox[] {
+    const ui = this.store.ui;
+    const key = `${this.scale.width}x${this.scale.height}|${ui.tutorialOpen}|${ui.paletteOpen}|${ui.selectedId !== null}|${ui.settingsOpen}|${ui.screen}`;
+    const now = performance.now();
+    if (this.cardCache && this.cardCache.key === key && now - this.cardCache.at < 500) return this.cardCache.boxes;
+    const boxes = this.readLabelCards();
+    this.cardCache = { key, at: now, boxes };
+    return boxes;
+  }
+
+  private readLabelCards(): ScreenBox[] {
     const cards: ScreenBox[] = [];
     for (const sel of ['.orderpanel', '.tutorial', '.inspector', '.palette', '.topbar']) {
       const el = document.querySelector(sel);
