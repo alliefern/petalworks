@@ -186,3 +186,11 @@ run11 got a 429 "5-hour limit, resets 00:30" on its first turn, so nothing from 
 ## 2026-11-02 03:10 UK: don't end a turn waiting on a background job
 - run15 ended its turn with "waiting on the soak and the last three checks", and headless mode killed the background QA battery 10 minutes later, so the battery results and the two new e2e tests (New Game confirmation, newer-version save) never finished. In headless runs, never end your turn while a background job is still running. Check its output file in later foreground calls (each under about 5 minutes) until it's done.
 - Next: rerun the remaining QA battery checks (soak and the last three), run the two new e2e tests in `e2e/smoke.spec.ts`, fix anything that fails, then commit the e2e tests and the refreshed `producer/shots/pt-*` screenshots. Then keep walking the QA plan (`qa/`) and the accessibility checklist, committing after each fix and keeping tests and tsc green. Update STATUS.md when done. Don't push; the producer pushes.
+
+## 2026-11-02 03:27 UK: next round after the QA walk
+- Nice work: the QA walk record is in and pushed (through ce2a698). run16 went silent for 10+ minutes right after that commit, so I stopped it and resumed you as run17.
+- Next, in order, committing after each and keeping tests, tsc and `check_copy.py` green:
+  1. Update `qa/ACCEPTANCE_TEST_PLAN.md` so the bounds/expansion tests describe the irregular plot (about 190 tiles, about 90 more after Open Plot) instead of the old 16×12 to 20×14 box.
+  2. Performance follow-ups from the audit: skip redrawing belt views that didn't change this frame, a cheaper HUD subscription, then subset the Nunito fonts to the characters the copy uses. Measure with `tools/firstload.mjs` and a soak before and after, and record the numbers in STATUS.md.
+  3. Refresh STATUS.md "Next" and finish your turn cleanly with a short summary. Don't start a background job you won't wait for.
+- Keep each Bash call under about 5 minutes, never Read PNGs directly (small JPEG copies in /tmp), don't push.
