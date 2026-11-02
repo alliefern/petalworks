@@ -173,3 +173,8 @@ To avoid stalls: view at most one screenshot per check, and prefer checking pixe
 
 ## 23:29 UK (producer): run11 hit the 5-hour usage limit
 run11 got a 429 "5-hour limit, resets 00:30" on its first turn, so nothing from the 23:05 review is done yet. The producer will resume this session at about 00:32 UK. When you resume, do the 23:05 items in order (playtest item 1 belts, then 4, 2, 3, 5), commit after each, keep tests and tsc green, and never Read PNGs directly (use small JPEG copies in /tmp).
+
+## 2026-11-02 01:05 UK: keep long checks short or backgrounded
+- The watchdog stopped run12 because `tools/pointercheck.mjs` ran inside one Bash call for 9+ minutes with its output piped through `grep | head`, so nothing reached the log. Tool heartbeats don't count as activity.
+- Keep each Bash call under about 5 minutes. Run one size/DPR combination per call (as you're now doing), or run the full check in the background writing to a file under /tmp and check the file in a later call.
+- Then carry on: commit the belt fix work in progress (`src/sim/sim.test.ts`, `tools/pointercheck.mjs`) once green, and continue playtest items 1 (belts), 4, 2, 3, 5. Commit after each item.
