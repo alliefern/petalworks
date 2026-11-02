@@ -5,7 +5,7 @@ import type { GameStore } from '../app/store';
 import { BELT_TICKS } from '../sim/data/balance';
 import { PLOTS, tilesOf } from '../sim/data/plots';
 import { STRUCTURES } from '../sim/data/structures';
-import { DX, DY, dirBetween, isOpenTile, opposite, rotateCCW, rotateCW } from '../sim/grid';
+import { DX, DY, dirBetween, isOpenTile, opposite } from '../sim/grid';
 import type { Dir, SimEvent, Structure, World } from '../sim/types';
 import { CameraController } from './camera';
 import { COLORS, DEPTH, TILE } from './constants';
@@ -13,6 +13,7 @@ import { placeLabelInView, type ScreenBox } from './labelPlace';
 import { DISC_SIZE, makeOverlayTextures } from './overlays';
 import { beltProgressT, itemPositionOnBelt, tileCenter } from './paths';
 import { SpriteRegistry } from './sprites';
+import { choosePiece } from './beltPiece';
 import { offset, organicOutline, resample } from './outline';
 import { COPY, fmt } from '../ui/strings';
 
@@ -144,7 +145,15 @@ export class PetalScene extends Phaser.Scene {
 
   private setImage(img: Phaser.GameObjects.Image, key: string, extraAngle = 0): void {
     const ref = this.sprites.get(key);
-    if (img.texture.key !== ref.texture || (ref.frame !== undefined && img.frame.name !== ref.frame)) img.setTexture(ref.texture, ref.frame);
+    if (img.texture.key !== ref.texture || (ref.frame !== undefined && img.frame.name !== ref.frame)) {
+      // Frames can differ in source size (144 px beds, 128 px machines); keep the display
+      // size the view chose so a texture swap never changes how big the building looks.
+      const w = img.displayWidth;
+      const h = img.displayHeight;
+      const hadReal = img.texture.key !== '__MISSING';
+      img.setTexture(ref.texture, ref.frame);
+      if (hadReal) img.setDisplaySize(w, h);
+    }
     img.setAngle(ref.angle + extraAngle);
   }
 
@@ -374,12 +383,7 @@ export class PetalScene extends Phaser.Scene {
     pennant.setDisplaySize(TILE * 0.5, TILE * 0.5);
     const disc = this.add.image(c.x, c.y, 'disc.blocked').setVisible(false).setDepth(DEPTH.badge + 1);
     disc.setDisplaySize(DISC_SIZE, DISC_SIZE);
-    const v: StructureView = { id: s.id, main, endcap, arrow, pennant, disc, beltSig: '', feeders: [], feedersAt: -1, arrowFacing: -1, sized: false };
-    if (!this.store.reducedMotion) {
-      main.setScale(0.6);
-      this.tweens.add({ targets: main, scaleX: 1, scaleY: 1, duration: 220, ease: 'Back.easeOut' });
-    }
-    return v;
+    return { id: s.id, main, endcap, arrow, pennant, disc, beltSig: '', feeders: [], feedersAt: -1, arrowFacing: -1, sized: false };
   }
 
   private feedersCached(v: StructureView, s: Structure): Dir[] {
@@ -424,12 +428,11 @@ export class PetalScene extends Phaser.Scene {
     const c = tileCenter(s.x, s.y);
     const def = STRUCTURES[s.kind];
     if (!v.sized) {
-      // Structures never move and each role has one size: set these once.
+      // Structures never move: set position and depth once. (Size is set below, after the
+      // first real texture is in, because the placeholder texture is a different size.)
       v.main.setPosition(c.x, c.y);
       v.endcap.setPosition(c.x, c.y);
-      if (s.kind === 'belt') v.main.setDisplaySize(TILE, TILE).setDepth(DEPTH.belt);
-      else v.main.setDisplaySize(STRUCTURE_SIZE, STRUCTURE_SIZE).setDepth(DEPTH.structure + s.y * 0.01);
-      v.sized = true;
+      v.main.setDepth(s.kind === 'belt' ? DEPTH.belt : DEPTH.structure + s.y * 0.01);
     }
     const tick = world.tick;
     const reduced = this.store.reducedMotion;
@@ -442,21 +445,8 @@ export class PetalScene extends Phaser.Scene {
       const sig = `${frame}|${s.facing}|${feeders.join('')}|${this.store.layoutVersion}`;
       if (sig !== v.beltSig) {
         v.beltSig = sig;
-        const behind = opposite(s.facing);
-        const left = rotateCCW(s.facing);
-        const right = rotateCW(s.facing);
-        let key: string;
-        let angle: number;
-        if (feeders.includes(behind) || feeders.length === 0 || (feeders.includes(left) && feeders.includes(right))) {
-          key = `belt.straight.${frame}`;
-          angle = FACING_ANGLE[s.facing];
-        } else if (feeders.includes(right)) {
-          key = `belt.corner.cw.${frame}`;
-          angle = (s.facing - 2) * 90;
-        } else {
-          key = `belt.corner.ccw.${frame}`;
-          angle = s.facing * 90;
-        }
+        const { piece, angle } = choosePiece(s.facing, feeders);
+        const key = piece === 'straight' ? `belt.straight.${frame}` : `belt.corner.${piece}.${frame}`;
         this.setImage(v.main, key, angle);
         const ahead = this.store.sim.at(s.x + DX[s.facing], s.y + DY[s.facing]);
         v.endcap.setVisible(!ahead).setAngle(FACING_ANGLE[s.facing]);
@@ -508,6 +498,22 @@ export class PetalScene extends Phaser.Scene {
         state = reduced ? (since < 3 ? 'receive0' : 'idle') : (`receive${Math.min(3, Math.floor(since / 2))}` as typeof state);
       }
       this.setImage(v.main, packingKey(state));
+    }
+
+    if (!v.sized) {
+      // Each role has one on-screen size, the same one the build ghost uses; set it once,
+      // now that the real frame is loaded, so the art's source size never leaks through.
+      const size = s.kind === 'belt' ? TILE : STRUCTURE_SIZE;
+      v.main.setDisplaySize(size, size);
+      v.sized = true;
+      if (!this.store.reducedMotion) {
+        // Pop in from 60% of the tile scale and settle on it exactly, so the placed
+        // building ends the same size as its ghost (never scale 1, the raw 2x art).
+        const sx = v.main.scaleX;
+        const sy = v.main.scaleY;
+        v.main.setScale(sx * 0.6, sy * 0.6);
+        this.tweens.add({ targets: v.main, scaleX: sx, scaleY: sy, duration: 220, ease: 'Back.easeOut' });
+      }
     }
 
     // Ink exit arrow on the facing edge of everything that outputs (constant 14×12 CSS px).

@@ -1,7 +1,7 @@
 # Status
 
 **Phase:** Phases 1–3 complete · Phase 4 polish done for this pass · final art and final copy wired
-**Last updated:** Nov 1, 2026 (late evening)
+**Last updated:** Nov 2, 2026 (early morning)
 
 ## What works right now (plain English)
 - Start a garden, read Nell's order, plant a Daisy Bed, drag belts to the crate, watch daisies ride in, get paid, unlock the next tool. All six orders work end to end, then the market opens (goods sell on arrival, every tool available).
@@ -13,6 +13,10 @@
 - Full keyboard play, dialogs trap focus, one reduced-motion flag, sound/music toggles persist. The real sound set is wired.
 - Autosave, Continue / New Game with confirmation, corrupted-save backup, schema v2 with a v1 migration.
 - Default zoom keeps tiles at least 48 px; at 1366×768 the garden sits between the tip card and the order card instead of under them; the fit re-runs on window resize (Steam-plan guardrail).
+
+## Round of Nov 2, 00:50 (Allie's playtest: belts, size jump, overlap)
+- **Belts fixed (playtest item 1).** Every placed building popped in with a scale tween that ended at scale 1, which is the raw 2x art, so each belt tile was drawn two tiles wide and the next tile's corner or straight piece showed on top of it ("straight and turning at the same time"). The pop-in now ends at the tile size, and the view sizes a building only after its real sprite is loaded. Each belt tile shows exactly one piece (straight, clockwise corner, counter-clockwise corner, or an end stop on a dead end) chosen from its neighbors by `src/game/beltPiece.ts`, which has a unit test for all four rotations of each piece, merges, and every feeder combination. `tools/beltloop.mjs` lays two rings by dragging (one each way), a side merge, a rotated belt and a removed mid-line belt, then checks every belt tile draws one 64 px piece. Screenshot 18 shows both loops.
+- The same bug made placed machines bigger than their ghost (item 2) and made neighbors look overlapped (item 4); both are covered by scripted checks in the next step.
 
 ## Round of Nov 1, 20:47 (Sugar Belt music, irregular plot)
 - **Music is now Allie's Sugar Belt soundtrack**, ported as `src/app/music.ts` and generated with Web Audio at runtime (music box, marimba, lo-fi keys and breathers over gentle progressions, modulating between keys). It starts on the first click with a 4 s fade, the music toggle and pause fade work as before, a hidden tab suspends it, and the arrangement fills out as the factory grows (machines and items on belts raise the intensity). No music file is downloaded any more: `assets/audio/music.*` stay as the audio team's source but are not loaded, and the lighter copies are gone. `tools/music-check.mjs` renders it offline: peak −11 dBFS, RMS −28 dBFS, no clipping, no silences, which matches the Sugar Belt preview recording (peak −10.4, mean −26.8).

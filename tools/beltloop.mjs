@@ -13,16 +13,21 @@ await page.waitForSelector('[data-testid="order"]');
 const report = await page.evaluate(() => {
   const s = window.petalworks;
   s.sim.world.coins = 500;
-  // Clockwise loop 6..9 x 4..7 by dragging four paths, like a player would.
-  s.dispatch({ type: 'place_belt_path', tiles: [6, 7, 8, 9].map((x) => ({ x, y: 4 })) });
-  s.dispatch({ type: 'place_belt_path', tiles: [4, 5, 6, 7].map((y) => ({ x: 9, y })) });
-  s.dispatch({ type: 'place_belt_path', tiles: [9, 8, 7, 6].map((x) => ({ x, y: 7 })) });
-  s.dispatch({ type: 'place_belt_path', tiles: [7, 6, 5, 4].map((y) => ({ x: 6, y })) });
-  // A counter-clockwise loop next to it: 11..14 x 4..7.
-  s.dispatch({ type: 'place_belt_path', tiles: [4, 5, 6, 7].map((y) => ({ x: 11, y })) });
-  s.dispatch({ type: 'place_belt_path', tiles: [11, 12, 13, 14].map((x) => ({ x, y: 7 })) });
-  s.dispatch({ type: 'place_belt_path', tiles: [7, 6, 5, 4].map((y) => ({ x: 14, y })) });
-  s.dispatch({ type: 'place_belt_path', tiles: [14, 13, 12, 11].map((x) => ({ x, y: 4 })) });
+  // Rings laid as one drag each, like a player would; the last tile is turned to close the loop.
+  const dirBetween = (a, b) => (b.y < a.y ? 0 : b.x > a.x ? 1 : b.y > a.y ? 2 : 3);
+  const ring = (x0, y0, x1, y1, cw) => {
+    const t = [];
+    for (let x = x0; x < x1; x++) t.push({ x, y: y0 });
+    for (let y = y0; y < y1; y++) t.push({ x: x1, y });
+    for (let x = x1; x > x0; x--) t.push({ x, y: y1 });
+    for (let y = y1; y > y0; y--) t.push({ x: x0, y });
+    return cw ? t : t.reverse();
+  };
+  for (const [tiles] of [[ring(6, 4, 9, 7, true)], [ring(11, 4, 14, 7, false)]]) {
+    s.dispatch({ type: 'place_belt_path', tiles });
+    const last = tiles[tiles.length - 1];
+    s.dispatch({ type: 'rotate', id: s.sim.at(last.x, last.y).id, facing: dirBetween(last, tiles[0]) });
+  }
   // A side merge into the first loop, and a belt rotated after placement, and a removed mid-line belt.
   s.dispatch({ type: 'place_belt_path', tiles: [{ x: 7, y: 2 }, { x: 7, y: 3 }] });
   s.dispatch({ type: 'rotate', id: s.sim.at(8, 4).id });
@@ -45,12 +50,13 @@ const counts = await page.evaluate((belts) => {
     const cx = b.x * 64 + 32;
     const cy = b.y * 64 + 32;
     const imgs = scene.children.list.filter((o) => o.type === 'Image' && o.visible && Math.abs(o.x - cx) < 1 && Math.abs(o.y - cy) < 1 && typeof o.frame?.name === 'string' && o.frame.name.startsWith('belt_'));
-    out.push({ x: b.x, y: b.y, facing: b.facing, pieces: imgs.map((o) => o.frame.name.replace(/_\d+$/, '') + '@' + Math.round(o.angle)) });
+    out.push({ x: b.x, y: b.y, facing: b.facing, pieces: imgs.map((o) => o.frame.name.replace(/_\d+$/, '') + '@' + Math.round(o.angle)), sizes: imgs.map((o) => Math.round(o.displayWidth) + 'x' + Math.round(o.displayHeight)) });
   }
   return out;
 }, report);
-const bad = counts.filter((c) => c.pieces.filter((p) => !p.startsWith('belt_end')).length !== 1);
-for (const c of counts) console.log(`(${c.x},${c.y}) f${c.facing}: ${c.pieces.join(' + ')}`);
-console.log(bad.length ? `FAIL ${bad.length} belt tiles draw more or fewer than one piece` : 'PASS every belt tile draws exactly one piece');
+// Exactly one piece per tile, and every piece (end caps too) is exactly one tile on screen.
+const bad = counts.filter((c) => c.pieces.filter((p) => !p.startsWith('belt_end')).length !== 1 || c.sizes.some((sz) => sz !== '64x64'));
+for (const c of counts) console.log(`(${c.x},${c.y}) f${c.facing}: ${c.pieces.join(' + ')} [${c.sizes.join(' ')}]`);
+console.log(bad.length ? `FAIL ${bad.length} belt tiles draw more or fewer than one piece, or a piece that is not one tile` : 'PASS every belt tile draws exactly one one-tile piece');
 await browser.close();
 process.exit(bad.length ? 1 : 0);
