@@ -66,6 +66,14 @@ export class PetalScene extends Phaser.Scene {
   private petals?: Phaser.GameObjects.Particles.ParticleEmitter;
   private sparkles?: Phaser.GameObjects.Particles.ParticleEmitter;
   ready = false;
+  /** Canvas pixels per CSS pixel (set by createGame before create() and on resize). */
+  renderScale = 1;
+
+  setRenderScale(k: number): void {
+    this.renderScale = k;
+    if (this.camCtl) this.camCtl.k = k;
+    (window as unknown as { __k?: number }).__k = k;
+  }
 
   constructor() {
     super('petal');
@@ -91,6 +99,8 @@ export class PetalScene extends Phaser.Scene {
     }
     makeOverlayTextures(this);
     this.camCtl = new CameraController(this);
+    this.camCtl.k = this.renderScale;
+    (window as unknown as { __k?: number }).__k = this.renderScale;
     this.camCtl.setWorldSize(this.store.sim.world.cols, this.store.sim.world.rows);
     this.frameUsedArea();
 
@@ -127,7 +137,7 @@ export class PetalScene extends Phaser.Scene {
       .setDepth(DEPTH.fx);
 
     this.setupInput();
-    this.scale.on('resize', () => this.applyFit(this.camCtl.reframe(this.store.ui.paletteOpen)));
+    this.scale.on('resize', () => this.applyFit(this.camCtl.reframe(this.store.ui.paletteOpen, this.store.ui.tutorialOpen)));
     (window as unknown as { __cam?: unknown; __scene?: unknown }).__cam = this.cameras.main;
     (window as unknown as { __scene?: unknown }).__scene = this;
     this.ready = true;
@@ -413,7 +423,7 @@ export class PetalScene extends Phaser.Scene {
       return;
     }
     const bob = this.store.reducedMotion ? 0 : Math.sin(simTime / 220) * 1.5;
-    const inv = 1 / this.cameras.main.zoom; // keep the disc 28 CSS px at any zoom
+    const inv = 1 / this.camCtl.cssZoom; // keep the disc 28 CSS px at any zoom
     const x = c.x + TILE * 0.34;
     const y = c.y - TILE * 0.34 + bob;
     if (pennantKey && this.sprites.has(pennantKey)) {
@@ -519,7 +529,7 @@ export class PetalScene extends Phaser.Scene {
     // Ink exit arrow on the facing edge of everything that outputs (constant 14×12 CSS px).
     if (def.hasFacing) {
       const d = s.facing;
-      const inv = 1 / this.cameras.main.zoom;
+      const inv = 1 / this.camCtl.cssZoom;
       const arrowKey = d * 1000 + Math.round(inv * 100);
       if (v.arrowFacing !== arrowKey) {
         v.arrowFacing = arrowKey;
@@ -650,9 +660,9 @@ export class PetalScene extends Phaser.Scene {
   private placeLockedLabels(): void {
     if (!this.lockedText.length) return;
     const cam = this.cameras.main;
-    const zoom = cam.zoom || 1;
+    const zoom = this.camCtl.cssZoom || 1; // CSS px per world px; the HUD cards are CSS px
     const view = cam.worldView;
-    const screen = { w: this.scale.width, h: this.scale.height };
+    const screen = this.camCtl.cssSize;
     const cards = this.labelCards();
     for (const t of this.lockedText) {
       t.setScale(1 / zoom);
@@ -692,7 +702,7 @@ export class PetalScene extends Phaser.Scene {
         this.labels.delete(id);
       }
     }
-    const inv = 1 / this.cameras.main.zoom;
+    const inv = 1 / this.camCtl.cssZoom;
     for (const [id, b] of want) {
       const s = world.structures[id];
       if (!s) continue;
@@ -925,13 +935,14 @@ export class PetalScene extends Phaser.Scene {
   }
 
   // ---- public controls used by the HUD -------------------------------------------------
-  private applyFit(r: { collapsePalette: boolean }): void {
+  private applyFit(r: { collapsePalette: boolean; collapseTutorial: boolean }): void {
     if (r.collapsePalette && this.store.ui.paletteOpen) this.store.setUi({ paletteOpen: false });
+    if (r.collapseTutorial && this.store.ui.tutorialOpen) this.store.setUi({ tutorialOpen: false });
   }
 
   /** Fit the whole yard (Fit button / Home). */
   recenter(): void {
-    this.applyFit(this.camCtl.fit(this.store.ui.paletteOpen));
+    this.applyFit(this.camCtl.fit(this.store.ui.paletteOpen, this.store.ui.tutorialOpen));
   }
 
   /**
@@ -975,7 +986,7 @@ export class PetalScene extends Phaser.Scene {
     y0 = Math.max(-1, y0);
     x1 = Math.min(w.cols + 1, x1);
     y1 = Math.min(w.rows + 1, y1);
-    this.applyFit(this.camCtl.frameUsed({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, this.store.ui.paletteOpen));
+    this.applyFit(this.camCtl.frameUsed({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, this.store.ui.paletteOpen, this.store.ui.tutorialOpen));
   }
 
   zoomBy(f: number): void {

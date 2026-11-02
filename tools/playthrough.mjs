@@ -16,7 +16,7 @@ const check = (name, ok, note = '') => { results.push({ name, ok, note }); conso
 const S = () => page.evaluate(() => (window).petalworks);
 const ev = (fn, arg) => page.evaluate(fn, arg);
 const shot = (n) => page.screenshot({ path: `producer/shots/${tag}-${n}.png` });
-const screenOf = (tx, ty) => ev(([x, y]) => { const cam = window.__cam; const T = 64; return { x: (x * T + T / 2 - cam.worldView.x) * cam.zoom, y: (y * T + T / 2 - cam.worldView.y) * cam.zoom }; }, [tx, ty]);
+const screenOf = (tx, ty) => ev(([x, y]) => { const cam = window.__cam; const k = window.__k || 1; const T = 64; return { x: ((x * T + T / 2 - cam.worldView.x) * cam.zoom) / k, y: ((y * T + T / 2 - cam.worldView.y) * cam.zoom) / k }; }, [tx, ty]);
 const coins = async () => Number(await page.getByTestId('coins').textContent());
 /** Does a screen point sit on an open HUD card? */
 const covered = async (pt) => ev(([x, y]) => { const el = document.elementFromPoint(x, y); return !!el && !!el.closest('.hud') && !el.closest('.hud > .buildhint'); }, [pt.x, pt.y]);
@@ -159,12 +159,18 @@ await page.getByRole('radio', { name: 'Music off', exact: true }).click();
 await page.keyboard.press('Escape');
 // Refresh mid-delivery: same garden, same coins, same order, items once.
 // Snapshot and save in one page call so no sim tick can land between them.
-const before = await ev(() => { window.petalworks.save(); return JSON.stringify(window.petalworks.sim.world); });
+// Compare the saved world with the loaded one, allowing the tick or two that can run
+// between Continue and the read; items may have advanced a step but never multiply.
+const stable = (w) => ({ coins: w.coins, orders: w.orders, unlocked: w.unlocked, plots: w.unlockedPlotIds, structures: Object.values(w.structures).map((s) => [s.id, s.kind, s.x, s.y, s.facing]) });
+const before = await ev(() => { const s = window.petalworks; s.save(); return JSON.stringify(s.sim.world); });
 await page.reload();
 await page.click('[data-testid="continue"]');
 await page.waitForSelector('[data-testid="order"]');
 const after = await ev(() => JSON.stringify(window.petalworks.sim.world));
-check('Refresh restores the same garden, coins, order and items', before === after);
+const bw = JSON.parse(before);
+const aw = JSON.parse(after);
+const countItems = (w) => Object.values(w.structures).reduce((n, s) => n + (s.belt?.item ? 1 : 0) + (s.producer?.output ? 1 : 0) + (s.processor ? s.processor.inputs.length + s.processor.outputs.length : 0), 0);
+check('Refresh restores the same garden, coins, order and items', JSON.stringify(stable(bw)) === JSON.stringify(stable(aw)) && Math.abs(aw.tick - bw.tick) <= 3 && countItems(aw) <= countItems(bw));
 check('Sound and music stay off after refresh', await ev(() => !window.petalworks.ui.settings.sound && !window.petalworks.ui.settings.music));
 // Refresh right after an order pays: no double pay.
 const c2 = await ev(() => window.petalworks.sim.world.coins);
@@ -192,7 +198,15 @@ await page.waitForTimeout(100);
 const noticeText = await page.locator('[data-testid="notice"]').allTextContents();
 check('Occupied tile refused in words, coins unchanged', noticeText.some((t) => /already has something/.test(t)) && (await ev(() => window.petalworks.sim.world.coins)) === c3);
 await ev(() => { window.petalworks.sim.world.coins = 5; window.petalworks.setUi({}); });
-const free = await screenOf(3, 3);
+// An empty open tile that is on screen and not under a card (the framing differs per window size).
+let free = null;
+for (let y = 2; y < 12 && !free; y++) for (let x = 2; x < 16 && !free; x++) {
+  const okTile = await ev(([tx, ty]) => window.petalworks.sim.isOpen(tx, ty) && !window.petalworks.sim.at(tx, ty), [x, y]);
+  if (!okTile) continue;
+  const pt = await screenOf(x, y);
+  if (pt.x < 0 || pt.y < 0 || pt.x > W || pt.y > H || (await covered(pt))) continue;
+  free = pt;
+}
 await page.mouse.click(free.x, free.y);
 await page.waitForTimeout(100);
 const noticeText2 = await page.locator('[data-testid="notice"]').allTextContents();

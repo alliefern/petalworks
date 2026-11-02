@@ -21,7 +21,8 @@ Honest list. Nothing here is disguised as finished.
 - The copy's "place a Packing Station" opening tip is skipped because the station is pre-placed.
 
 ## Layout
-- Below about 1200 px wide, Fit (the whole 18-tile yard at the 40 px tile floor) cannot sit beside both side cards (212 px each), so at 1024×640 the cards cover the yard's outer columns after Fit. The default framing (the used area) stays clear of the cards at every size, and the cards shrink below 1150 px. From 1280 px up the whole yard fits beside the cards.
+- Fit frames the yard in the free column between the tip and order cards, below the top bar and above the palette, measured from the real HUD. When the whole yard cannot sit beside both side cards at the 40 px tile floor (below about 1300 px wide, since the yard is now about 20 tiles across), Fit closes the tip card (the Tips button brings it back) and, as before, the palette. At 1024×640 the window is also too short for the yard at the 40 px floor (14 rows need 568 px plus the top bar and the Build button), so after Fit the top and bottom rows sit a few px under those bars; the side cards never cover the yard, and the default framing is always clear. `tools/layoutcheck.mjs` checks this from 1024×640 to 3840×2160 (QUESTIONS #11).
+- The canvas renders at the device pixel ratio (capped at 2×) within a 16-megapixel budget, so a 4K monitor at 2× renders at about 1.4× rather than 2×.
 
 ## Performance
 - First load at Slow 4G is about 7.8 s to a clickable New Game (1.43 MB). The remaining weight is Phaser's bundle and three full Nunito TTFs; font subsetting and a slimmer Phaser build are not done.

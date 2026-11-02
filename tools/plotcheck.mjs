@@ -51,7 +51,7 @@ await page.screenshot({ path: shot });
 // Now hide the HUD and read the bare canvas.
 await page.addStyleTag({ content: '#app > *:not(#game), .hud, .topbar, .palette, .orderpanel, .tutorial, .inspector { visibility: hidden !important; }' });
 await page.waitForTimeout(200);
-const cam = await page.evaluate(() => ({ x: window.__cam.worldView.x, y: window.__cam.worldView.y, zoom: window.__cam.zoom }));
+const cam = await page.evaluate(() => ({ x: window.__cam.worldView.x, y: window.__cam.worldView.y, zoom: window.__cam.zoom / (window.__k || 1) }));
 const png = await page.screenshot({ type: 'png' });
 const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
 const linen = [0xe3, 0xd9, 0xbf];

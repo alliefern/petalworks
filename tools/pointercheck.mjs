@@ -32,9 +32,11 @@ for (const [vw, vh] of SIZES) {
     console.log(`${vw}x${vh} @${dpr}x`);
     const canvas = await page.evaluate(() => { const c = document.querySelector('canvas'); const r = c.getBoundingClientRect(); return { left: r.left, top: r.top, cssW: r.width, cssH: r.height, w: c.width, h: c.height }; });
     // Sharpness at high DPR is playtest item 5 (responsive layout); reported here, counted there.
-    const sharp = Math.abs(canvas.w - canvas.cssW * dpr) <= 2 && Math.abs(canvas.h - canvas.cssH * dpr) <= 2;
-    console.log(`  ${sharp ? 'ok  ' : 'note'} canvas backing store ${canvas.w}x${canvas.h} for ${canvas.cssW}x${canvas.cssH} css at ${dpr}x${sharp ? '' : ' (not yet DPR-sharp; see item 5)'}`);
-    const screenOf = (tx, ty, fx = 0.5, fy = 0.5) => page.evaluate(([x, y, fx, fy, left, top]) => { const cam = window.__cam; const T = 64; return { x: left + (x * T + T * fx - cam.worldView.x) * cam.zoom, y: top + (y * T + T * fy - cam.worldView.y) * cam.zoom }; }, [tx, ty, fx, fy, canvas.left, canvas.top]);
+    // Sharpness: the canvas has k pixels per CSS px, k = min(dpr, 2) within a 16 MP budget.
+    const k = await page.evaluate(() => window.__k || 1);
+    const expectedK = Math.max(1, Math.min(dpr, 2, Math.sqrt(16_000_000 / (canvas.cssW * canvas.cssH))));
+    check(Math.abs(k - expectedK) < 0.01 && Math.abs(canvas.w - canvas.cssW * k) <= 2 && Math.abs(canvas.h - canvas.cssH * k) <= 2, `canvas ${canvas.w}x${canvas.h} for ${canvas.cssW}x${canvas.cssH} css at ${dpr}x (k=${k.toFixed(2)}, expected ${expectedK.toFixed(2)})`);
+    const screenOf = (tx, ty, fx = 0.5, fy = 0.5) => page.evaluate(([x, y, fx, fy, left, top]) => { const cam = window.__cam; const k = window.__k || 1; const T = 64; return { x: left + ((x * T + T * fx - cam.worldView.x) * cam.zoom) / k, y: top + ((y * T + T * fy - cam.worldView.y) * cam.zoom) / k }; }, [tx, ty, fx, fy, canvas.left, canvas.top]);
     const covered = (pt) => page.evaluate(([x, y]) => { const el = document.elementFromPoint(x, y); return !!el && !!el.closest('.hud') && !el.closest('.buildhint'); }, [pt.x, pt.y]);
     let zi = 0;
     for (const zoom of ZOOMS) {
