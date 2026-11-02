@@ -198,6 +198,8 @@ EXTRA_LEAF_PATHS = (
     'extra.controlsExtra[9][1]',
     'extra.controlsExtra[10][0]',
     'extra.controlsExtra[10][1]',
+    'extra.controlsExtra[11][0]',
+    'extra.controlsExtra[11][1]',
     'extra.sound.musicVolume',
     'extra.sound.musicVolumeHelp',
     'extra.sound.sfxVolume',
