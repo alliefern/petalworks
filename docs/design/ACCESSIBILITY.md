@@ -323,6 +323,7 @@ Layout budget: top bar 56px on one row, build palette 256px and collapsible. A 1
 - Target tile at that fit: **at least 48 CSS px** on every window in the table, palette open.
 - If the fit would drop under 48px, start with the palette collapsed and fit again.
 - Hard floor: **40 CSS px**. Under that, the player zooms in. Default zoom on the table above stays at or above 48.
+- Fit-only exception (decided Nov 2, 2026, ANSWERS #11): on a window shorter than 700 px, **Fit** (the whole-yard button / Home) may go down to **34 CSS px** so a small laptop such as 1024×640 still sees the whole yard at once. Default framing, the collapse rules above and every other zoom keep the 40 px floor; the player zooms back in from there.
 
 Worked example, 1366×768, palette open at 256px, top bar 56px, 16px of padding: about 1094×696 left. A 48px tile needs 768×576. The fit lands near 56px. That is the intended default.
 

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TILE } from './constants';
-import { uiScaleFor } from './viewport';
+import { fitFloorFor, uiScaleFor } from './viewport';
 
 export { PIXEL_BUDGET, renderScaleFor, uiScaleFor } from './viewport';
 
@@ -113,6 +113,9 @@ export class CameraController {
     const zoomFor = (padBottom: number, leftGutter: number) => Math.min((vw - leftGutter - right) / w, (vh - padTop - padBottom) / h);
     let collapse = false;
     let collapseTutorial = false;
+    // Fit (the whole yard, capZoom false) may go under the 40 px floor only on a short
+    // window; default framing (capZoom true) always keeps the hard floor.
+    const floor = capZoom ? FLOOR_TILE : fitFloorFor(vh, FLOOR_TILE);
     let padBottom = padBottomOpen;
     let left = tutorialOpen ? leftOpen : 16;
     let zoom = zoomFor(padBottom, left);
@@ -123,12 +126,12 @@ export class CameraController {
     }
     // On a narrow window the whole yard cannot sit beside both side cards at the 40 px
     // floor; rather than let the tip card cover the yard's edge, close the tip card.
-    if (tutorialOpen && zoom * TILE < FLOOR_TILE) {
+    if (tutorialOpen && zoom * TILE < floor) {
       collapseTutorial = true;
       left = 16;
       zoom = zoomFor(padBottom, left);
     }
-    zoom = Phaser.Math.Clamp(zoom, FLOOR_TILE / TILE, (capZoom ? 1.5 : this.maxZoom) * ui);
+    zoom = Phaser.Math.Clamp(zoom, floor / TILE, (capZoom ? 1.5 : this.maxZoom) * ui);
     this.cam.setZoom(zoom * this.k);
     // Put the framed area's centre at the centre of the free column: the camera's own centre
     // sits that much further toward the bigger inset (right card / palette) in world units.

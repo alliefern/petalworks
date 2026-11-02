@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { PIXEL_BUDGET, renderScaleFor, uiScaleFor } from './viewport';
+import { fitFloorFor, PIXEL_BUDGET, renderScaleFor, uiScaleFor } from './viewport';
 
 describe('viewport rules', () => {
+  it('lets Fit drop to 34 px tiles only on windows shorter than 700 px', () => {
+    expect(fitFloorFor(640)).toBe(34);
+    expect(fitFloorFor(699)).toBe(34);
+    expect(fitFloorFor(700)).toBe(40);
+    expect(fitFloorFor(1080)).toBe(40);
+  });
   it('scales the HUD up only on very wide windows, matching the CSS breakpoints', () => {
     expect(uiScaleFor(1024)).toBe(1);
     expect(uiScaleFor(1920)).toBe(1);

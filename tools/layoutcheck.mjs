@@ -40,7 +40,8 @@ for (const [vw, vh] of SIZES) {
       const sx = ((x * T + T / 2 - cam.worldView.x) * cam.zoom) / k;
       const sy = ((y * T + T / 2 - cam.worldView.y) * cam.zoom) / k;
       out.minX = Math.min(out.minX, sx); out.maxX = Math.max(out.maxX, sx); out.minY = Math.min(out.minY, sy); out.maxY = Math.max(out.maxY, sy);
-      if (sx < 0 || sy < 0 || sx > innerWidth || sy > innerHeight) { out.offscreen++; continue; }
+      const half = (T * cam.zoom) / k / 2;
+      if (sx - half < 0 || sy - half < 0 || sx + half > innerWidth || sy + half > innerHeight) { out.offscreen++; continue; }
       const el = document.elementFromPoint(sx, sy);
       const hit = el && el.closest('.hud') && !el.closest('.buildhint') ? el.closest('.tutorial, .orderpanel, .inspector, .palette, .topbar, .card') : null;
       if (hit) { const cls = String(hit.className).split(' ').find((c) => /tutorial|orderpanel|inspector|palette|topbar/.test(c)) || String(hit.className).split(' ')[0]; out.covered.push(`${x},${y}:${cls}`); }
@@ -62,21 +63,19 @@ for (const [vw, vh] of SIZES) {
   await page.waitForTimeout(400);
   await page.evaluate(() => new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res))));
   r = await survey();
-  check(r.offscreen === 0, `after Fit: all ${r.tiles} open tiles are on screen`);
-  // Side cards must never cover the yard. The top bar and the Build button may only touch it
-  // when the window is too short to hold the whole yard at the 40 px tile floor.
-  const atFloor = r.tileCss <= 40.5;
+  check(r.offscreen === 0, `after Fit: all ${r.tiles} open tiles are fully on screen${r.offscreen ? ' (' + r.offscreen + ' cut off)' : ''}`);
+  // Nothing in the HUD may cover an open tile after Fit: side cards, top bar or palette.
   const bySide = r.covered.filter((c) => /tutorial|orderpanel|inspector/.test(c));
   const byBars = r.covered.filter((c) => !/tutorial|orderpanel|inspector/.test(c));
   check(bySide.length === 0, `after Fit: no open tile under a side card${bySide.length ? ' (' + bySide.slice(0, 6).join(' ') + ')' : ''}`);
-  if (byBars.length && atFloor) console.log(`  note ${byBars.length} tiles touch the top bar or Build button: window too short for the yard at the 40 px floor (${byBars.slice(0, 5).join(' ')})`);
-  else check(byBars.length === 0, `after Fit: no open tile under the top bar or palette${byBars.length ? ' (' + byBars.slice(0, 6).join(' ') + ')' : ''}`);
+  check(byBars.length === 0, `after Fit: no open tile under the top bar or palette${byBars.length ? ' (' + byBars.slice(0, 6).join(' ') + ')' : ''}`);
   const left = r.cards.tip ? r.cards.tip.right : 0;
   const right = r.cards.order ? r.cards.order.left : vw;
   const colCentre = (left + right) / 2;
   const yardCentre = (r.minX + r.maxX) / 2;
   check(Math.abs(colCentre - yardCentre) <= Math.max(24, r.tileCss), `after Fit: yard centred in the free column (yard ${yardCentre.toFixed(0)}, column ${colCentre.toFixed(0)})`);
-  check(r.tileCss >= 40 - 0.5, `after Fit: tiles are ${r.tileCss.toFixed(1)} css px (at least 40)`);
+  const fitFloor = vh < 700 ? 34 : 40;
+  check(r.tileCss >= fitFloor - 0.5, `after Fit: tiles are ${r.tileCss.toFixed(1)} css px (at least ${fitFloor}; Fit-only exception under 700 px tall)`);
 
   // 3. HUD scale: the top bar grows with the window on wide screens.
   const barH = r.cards.topbar ? r.cards.topbar.bottom - r.cards.topbar.top : 0;
