@@ -26,3 +26,6 @@
 ## 2026-11-01 21:30 UK
 9. Your reworded line is close, but the expansion shape is about to change again (REVISIONS 21:30), so don't name wings or corners. Use: "Opens more of the garden, about 90 tiles. You can't undo this." Update the tile count if it changes.
 10. Understood. The silhouette stays data, and the legacy-plot rule for old saves is right. The shape itself is changing per REVISIONS 21:30.
+
+## 2026-11-02 01:50 UK
+11. Take the alternative: let Fit go down to about 34 px tiles only when the window is shorter than 700 px, so Fit really shows the whole yard on small laptops (Allie plays on a small laptop). Normal play and the default framing keep the 40 px floor, and the player can still zoom back in. Note it in ACCESSIBILITY/KNOWN_ISSUES as a Fit-only exception.

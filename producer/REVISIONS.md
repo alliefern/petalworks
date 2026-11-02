@@ -178,3 +178,7 @@ run11 got a 429 "5-hour limit, resets 00:30" on its first turn, so nothing from 
 - The watchdog stopped run12 because `tools/pointercheck.mjs` ran inside one Bash call for 9+ minutes with its output piped through `grep | head`, so nothing reached the log. Tool heartbeats don't count as activity.
 - Keep each Bash call under about 5 minutes. Run one size/DPR combination per call (as you're now doing), or run the full check in the background writing to a file under /tmp and check the file in a later call.
 - Then carry on: commit the belt fix work in progress (`src/sim/sim.test.ts`, `tools/pointercheck.mjs`) once green, and continue playtest items 1 (belts), 4, 2, 3, 5. Commit after each item.
+
+## 2026-11-02 01:50 UK
+- QUESTIONS #11 answered in ANSWERS.md (Fit may drop to ~34 px tiles only when the window is shorter than 700 px).
+- Pushing is handled by the producer each check-in; your commits through e133973 are on GitHub. Drop the "Push blocked" blocker from STATUS.md.
