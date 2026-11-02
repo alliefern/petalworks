@@ -1,7 +1,7 @@
 # Status
 
 **Phase:** Phases 1–3 complete · Phase 4 polish done for this pass · final art and final copy wired
-**Last updated:** Nov 2, 2026 (03:40 UK)
+**Last updated:** Nov 2, 2026 (04:10 UK)
 
 ## What works right now (plain English)
 - Start a garden, read Nell's order, plant a Daisy Bed, drag belts to the crate, watch daisies ride in, get paid, unlock the next tool. All six orders work end to end, then the market opens (goods sell on arrival, every tool available).
@@ -13,6 +13,19 @@
 - Full keyboard play, dialogs trap focus, one reduced-motion flag, sound/music toggles persist. The real sound set is wired.
 - Autosave, Continue / New Game with confirmation, corrupted-save backup, schema v2 with a v1 migration.
 - Default zoom keeps tiles at least 48 px; at 1366×768 the garden sits between the tip card and the order card instead of under them; the fit re-runs on window resize (Steam-plan guardrail).
+
+## Round of Nov 2, 04:10 (plan update and performance follow-ups)
+- `qa/ACCEPTANCE_TEST_PLAN.md` now describes the irregular plot: about 180 buildable tiles inside a 20 by 14 box at the start, about 90 more after Open Plot, with test 53 rewritten around the hedge, the bays and the closed field.
+- The three performance follow-ups from the audit were already in the build from the Nov 1 19:46 round (unchanged belt views are skipped by a per-belt signature; the HUD re-renders at most five times a second on sim ticks; Nunito is subset to the glyphs the game can show, three woff2 files of about 12.9 KB each). Re-running the subset after this week's new copy changed nothing, so the new strings are covered. The one per-frame item still open from the audit was the closed-field label placement reading the HUD card boxes every frame; those boxes are now cached and refreshed only when the HUD or window changes, or every half second.
+- Numbers, measured today with `tools/firstload.mjs` (cold load, Slow 4G, 1280x800), a 60 s soak at 3x in the open market, and the new `tools/framecost.mjs` (frame cost with the Open Plot preview showing, software GL):
+
+| | Nov 1 audit | Nov 1 19:46 | Today |
+| --- | --- | --- | --- |
+| Bytes before New Game works | 4.47 MB | 1.09 MB | 1.10 MB (21 requests) |
+| New Game clickable, Slow 4G | 23.0 s | 6.5 s | 6.6 s |
+| Fonts on the wire | 376 KB (3 TTF) | 38 KB (3 woff2) | 38 KB, same glyph set |
+| HUD layout reads per frame, closed field showing | about 4 + 4 computed styles | same | 0.55 + 0.5 (refresh every 500 ms) |
+| 60 s soak at 3x | clean | clean | clean, 57 deliveries, no console errors |
 
 ## Round of Nov 2, 03:40 (QA walk: accessibility checklist and the acceptance plan)
 Everything below ran against the current build with the tools in `tools/`, each run after the last code change. "Scripted" means a tool checks it on every run.
@@ -116,9 +129,10 @@ Not covered by any script and still for a human: listening to each sound cue und
 00 title · 01 fresh garden · 02 first chain · 03 inspector · 04 all machines with a blocked bed and the keyboard cursor · 05 build ghost · 06 settings · 07 1366×768 · 08 1280×800 · 09 order-complete beat · 10 toolbar close-up · 11 top bar close-up.
 
 ## Next
-- Human playtest against `qa/playthrough-checklist.md`; answer anything in `producer/QUESTIONS.md` (#11 is the only open one from this round).
+- Human playtest against `qa/playthrough-checklist.md` (Allie on her small laptop would be ideal; Fit now shows the whole yard at 1024x640).
+- Listening pass over the sound cue table in the acceptance plan (test 26); the only rows no script covers.
 - Allie's redrawn hedge art drops in by file name when it lands; the hedge line is already continuous.
-- Optional performance follow-ups from the audit's list 4–5: skip unchanged belt views per frame, cheaper HUD subscription, font subsetting, slimmer Phaser build, lighter music file.
+- Optional, from the audit: a slimmer Phaser build (left alone, as asked).
 
 ## Blockers
 - None. Commits land on `main` here and the producer pushes them at each check-in.
