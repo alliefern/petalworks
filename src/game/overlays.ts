@@ -74,11 +74,14 @@ export function makeOverlayTextures(scene: Phaser.Scene): void {
       g.strokePath();
     }
   };
-  // Valid: four open ink brackets over a soft sage ring.
+  // Valid: four open ink brackets over a cream ring with an ink hairline, so the ring
+  // still reads on grass in grayscale (sage on sage vanished).
   ring('ring.valid', (g, s) => {
-    g.lineStyle(4 * SS, COLORS.sage, 0.9);
+    g.lineStyle(4 * SS, COLORS.cream, 0.95);
     g.strokeRoundedRect(4 * SS, 4 * SS, s - 8 * SS, s - 8 * SS, 10 * SS);
-    brackets(g, s, 14 * SS, 2.5 * SS);
+    g.lineStyle(1.5 * SS, COLORS.ink, 0.7);
+    g.strokeRoundedRect(4 * SS, 4 * SS, s - 8 * SS, s - 8 * SS, 10 * SS);
+    brackets(g, s, 14 * SS, 3 * SS);
   });
   // Invalid: the same brackets plus an ink X over a coral ring.
   ring('ring.invalid', (g, s) => {
