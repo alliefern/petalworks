@@ -182,3 +182,7 @@ run11 got a 429 "5-hour limit, resets 00:30" on its first turn, so nothing from 
 ## 2026-11-02 01:50 UK
 - QUESTIONS #11 answered in ANSWERS.md (Fit may drop to ~34 px tiles only when the window is shorter than 700 px).
 - Pushing is handled by the producer each check-in; your commits through e133973 are on GitHub. Drop the "Push blocked" blocker from STATUS.md.
+
+## 2026-11-02 03:10 UK: don't end a turn waiting on a background job
+- run15 ended its turn with "waiting on the soak and the last three checks", and headless mode killed the background QA battery 10 minutes later, so the battery results and the two new e2e tests (New Game confirmation, newer-version save) never finished. In headless runs, never end your turn while a background job is still running. Check its output file in later foreground calls (each under about 5 minutes) until it's done.
+- Next: rerun the remaining QA battery checks (soak and the last three), run the two new e2e tests in `e2e/smoke.spec.ts`, fix anything that fails, then commit the e2e tests and the refreshed `producer/shots/pt-*` screenshots. Then keep walking the QA plan (`qa/`) and the accessibility checklist, committing after each fix and keeping tests and tsc green. Update STATUS.md when done. Don't push; the producer pushes.
