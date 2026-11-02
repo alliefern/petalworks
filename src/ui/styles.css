@@ -94,11 +94,12 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible, a:focus-vis
 .topbar {
   position: absolute; top: 10px; left: 12px; right: 12px;
   display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; /* at 200% browser zoom the bar wraps to a second row instead of clipping */
   pointer-events: none;
 }
 .topbar > * { pointer-events: auto; }
-.topbar .group { display: flex; align-items: center; gap: 6px; padding: 4px 8px; min-height: 48px; }
-.topbar .group .btn { padding: 6px 10px; min-height: 40px; }
+.topbar .group { display: flex; align-items: center; gap: 6px; padding: 4px 8px; min-height: 52px; }
+.topbar .group .btn { padding: 6px 10px; min-height: 44px; min-width: 44px; justify-content: center; }
 .topbar .spacer { flex: 1; pointer-events: none; }
 .coins { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 20px; padding: 6px 14px 6px 10px; min-height: 48px; }
 .paused-chip { font-weight: 800; color: var(--coral-deep); }
@@ -309,3 +310,10 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible, a:focus-vis
 .slider { display: inline-flex; align-items: center; gap: 8px; }
 .slider input[type='range'] { width: 150px; accent-color: var(--honey-deep); cursor: pointer; }
 .slider .val { min-width: 30px; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* Very narrow windows (200% browser zoom on a laptop): the top bar wraps to two or three
+   rows, so the side cards start lower and the tip card does not sit under the bar. */
+@media (max-width: 760px) {
+  .orderpanel, .tutorial { top: 180px; }
+  .orderpanel { width: min(264px, calc(100% - 24px)); }
+}
