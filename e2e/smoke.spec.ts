@@ -233,6 +233,66 @@ test.describe('Petalworks smoke', () => {
     expect(await page.evaluate(() => localStorage.getItem('petalworks.save.backup'))).toContain('nope');
   });
 
+  test('New Game asks first; cancel keeps the garden, confirm starts over (plan test 57)', async ({ page }) => {
+    await startFresh(page);
+    // A distinctive garden: a belt and spent coins.
+    await page.evaluate(() => {
+      const s = (window as any).petalworks;
+      s.dispatch({ type: 'place_belt_path', tiles: [4, 5, 6].map((x) => ({ x, y: 5 })) });
+      s.save();
+    });
+    const coins = await page.evaluate(() => (window as any).petalworks.sim.world.coins);
+    await page.click('[data-testid="settings"]');
+    await page.getByTestId('settings-new-game').click();
+    // Plain-language confirmation, then cancel.
+    await expect(page.getByTestId('settings-modal')).toContainText(/erases your saved garden/i);
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.keyboard.press('Escape');
+    expect(await page.evaluate(() => (window as any).petalworks.sim.at(5, 5)?.kind)).toBe('belt');
+    await page.reload();
+    await page.click('[data-testid="continue"]');
+    await page.waitForSelector('[data-testid="order"]');
+    expect(await page.evaluate(() => (window as any).petalworks.sim.at(5, 5)?.kind)).toBe('belt');
+    expect(await page.evaluate(() => (window as any).petalworks.sim.world.coins)).toBe(coins);
+    // Confirm: order 1, starting coins, empty yard, tips offered again.
+    await page.click('[data-testid="settings"]');
+    await page.getByTestId('settings-new-game').click();
+    await page.getByTestId('settings-new-game-confirm').click();
+    await expect(page.getByTestId('order')).toContainText('Deliver 2 Daisies');
+    expect(await page.evaluate(() => (window as any).petalworks.sim.world.coins)).toBe(120);
+    expect(await page.evaluate(() => (window as any).petalworks.sim.at(5, 5))).toBeNull();
+    await expect(page.getByTestId('tutorial')).toBeVisible();
+    // A reload shows the new game, not the old one.
+    await page.reload();
+    await page.click('[data-testid="continue"]');
+    await page.waitForSelector('[data-testid="order"]');
+    expect(await page.evaluate(() => (window as any).petalworks.sim.at(5, 5))).toBeNull();
+    expect(await page.evaluate(() => (window as any).petalworks.sim.world.coins)).toBe(120);
+  });
+
+  test('a save from a newer version explains itself and offers a new game (plan test 56)', async ({ page }) => {
+    await startFresh(page);
+    await page.evaluate(() => (window as any).petalworks.save());
+    // Back on the title screen (no game running, so nothing autosaves over the edit).
+    await page.goto('/');
+    await page.waitForSelector('[data-testid="title"]');
+    await page.evaluate(() => {
+      const raw = JSON.parse(localStorage.getItem('petalworks.save')!);
+      raw.schemaVersion = 9999;
+      localStorage.setItem('petalworks.save', JSON.stringify(raw));
+    });
+    await page.reload();
+    await page.waitForSelector('[data-testid="title"]');
+    await page.waitForFunction(() => !document.querySelector('[data-testid="new-game"]')?.hasAttribute('disabled'));
+    await page.click('[data-testid="continue"]');
+    await expect(page.locator('.problem')).toBeVisible();
+    await expect(page.locator('.problem')).not.toContainText(/JSON|schema|undefined/);
+    await page.click('[data-testid="new-game"]');
+    await expect(page.getByTestId('order')).toBeVisible();
+    // The unreadable save was kept as a backup rather than deleted.
+    expect(await page.evaluate(() => localStorage.getItem('petalworks.save.backup'))).toContain('9999');
+  });
+
   test('the Open Plot label stays on screen and clear of the side cards', async ({ page }) => {
     await startFresh(page);
     await page.evaluate(async () => {
