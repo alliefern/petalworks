@@ -297,3 +297,10 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible, a:focus-vis
 .loading-bar { height: 10px; border-radius: 5px; background: rgba(57, 70, 59, 0.12); overflow: hidden; border: 1px solid rgba(57, 70, 59, 0.15); }
 .loading-bar > span { display: block; height: 100%; background: var(--moss); transition: width 120ms linear; }
 .loading-text { font-size: 14px; color: var(--ink-soft); margin-top: 6px; }
+
+/* ---- sound controls ---- */
+.btn.muted img { opacity: 0.55; }
+.btn.muted { background: var(--cream-deep); }
+.slider { display: inline-flex; align-items: center; gap: 8px; }
+.slider input[type='range'] { width: 150px; accent-color: var(--honey-deep); cursor: pointer; }
+.slider .val { min-width: 30px; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }

@@ -534,7 +534,7 @@ The {name} stays in the garden. (`extra.palette.staysInYard` and `extra.errors.n
 
 Place {item} (`extra.palette.placeItem`). Needs an empty belt. (`extra.palette.needsBelt`). Click to drop it on this belt. (`extra.palette.dropHere`)
 
-After the Open Plot cost line: The garden grows to 20 by 14 tiles. (`extra.palette.expandLine`)
+After the Open Plot cost line: Opens more of the garden, about 90 tiles. You can't undo this. (`extra.palette.expandLine`)
 
 ### Blocked
 
@@ -617,3 +617,10 @@ Shown under the controls table. Input, then action.
 | = and - | Zoom in or out |
 | Home | Fit the garden |
 | H | Open How to Play |
+| M | Sound on or off |
+
+### Sound controls (added Nov 2)
+
+Top-bar speaker button, next to the speed buttons. Its screen-reader label: Sound on. Press to mute the music and effects. (`extra.sound.a11yOn`) / Sound off. Press to hear the music and effects again. (`extra.sound.a11yOff`). Hidden text: Sound on (`extra.sound.on`) / Sound off (`extra.sound.off`). Tooltip: Sound on or off (M) (`extra.sound.tooltip`).
+
+Settings sliders: Music volume (`extra.sound.musicVolume`). How loud the tune plays. (`extra.sound.musicVolumeHelp`) Sound effects volume (`extra.sound.sfxVolume`). Let go of the slider to hear a sample. (`extra.sound.sfxVolumeHelp`)

@@ -221,8 +221,11 @@ export class GameStore {
   }
 
   private applyAudioSettings(): void {
-    audio.setSound(this.ui.settings.sound);
-    audio.setMusic(this.ui.settings.music);
+    const s = this.ui.settings;
+    audio.setLevels(s.sfxVolume / 100, s.musicVolume / 100);
+    audio.setMuted(s.muted);
+    audio.setSound(s.sound);
+    audio.setMusic(s.music);
     if (typeof document !== 'undefined') {
       document.documentElement.setAttribute('data-reduced-motion', this.ui.settings.reducedMotion ? 'true' : 'false');
     }
@@ -240,7 +243,7 @@ export class GameStore {
       cursor: null,
       paused: false,
       speed: 1,
-      settings: { ...DEFAULT_SETTINGS, sound: keep.sound, music: keep.music, reducedMotion: keep.reducedMotion },
+      settings: { ...DEFAULT_SETTINGS, sound: keep.sound, music: keep.music, muted: keep.muted, musicVolume: keep.musicVolume, sfxVolume: keep.sfxVolume, reducedMotion: keep.reducedMotion },
       tutorialOpen: true,
       completionOpen: false,
       settingsOpen: false,
@@ -555,6 +558,11 @@ export class GameStore {
 
   cycleSpeed(): void {
     this.setSpeed((this.ui.speed === 3 ? 1 : this.ui.speed + 1) as 1 | 2 | 3);
+  }
+
+  /** The top-bar speaker (and the M key). */
+  toggleMute(): void {
+    this.updateSettings({ muted: !this.ui.settings.muted });
   }
 
   updateSettings(patch: Partial<Settings>): void {

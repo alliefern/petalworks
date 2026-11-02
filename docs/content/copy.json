@@ -46,17 +46,61 @@
     "close": "Close"
   },
   "controls": [
-    { "id": "place", "action": "Place or select", "input": "Left-click" },
-    { "id": "belt", "action": "Lay belts", "input": "Click and drag" },
-    { "id": "rotate", "action": "Rotate", "input": "R" },
-    { "id": "cancel", "action": "Cancel", "input": "Esc or right-click" },
-    { "id": "undo", "action": "Undo last build", "input": "Z" },
-    { "id": "remove", "action": "Remove", "input": "Remove tool" },
-    { "id": "pan", "action": "Pan", "input": "Drag empty grass, or middle mouse" },
-    { "id": "zoom", "action": "Zoom", "input": "Mouse wheel" },
-    { "id": "pause", "action": "Pause or resume", "input": "Pause button" },
-    { "id": "fast", "action": "Run faster", "input": "Fast button" },
-    { "id": "menus", "action": "Move through buttons", "input": "Tab, then Enter" }
+    {
+      "id": "place",
+      "action": "Place or select",
+      "input": "Left-click"
+    },
+    {
+      "id": "belt",
+      "action": "Lay belts",
+      "input": "Click and drag"
+    },
+    {
+      "id": "rotate",
+      "action": "Rotate",
+      "input": "R"
+    },
+    {
+      "id": "cancel",
+      "action": "Cancel",
+      "input": "Esc or right-click"
+    },
+    {
+      "id": "undo",
+      "action": "Undo last build",
+      "input": "Z"
+    },
+    {
+      "id": "remove",
+      "action": "Remove",
+      "input": "Remove tool"
+    },
+    {
+      "id": "pan",
+      "action": "Pan",
+      "input": "Drag empty grass, or middle mouse"
+    },
+    {
+      "id": "zoom",
+      "action": "Zoom",
+      "input": "Mouse wheel"
+    },
+    {
+      "id": "pause",
+      "action": "Pause or resume",
+      "input": "Pause button"
+    },
+    {
+      "id": "fast",
+      "action": "Run faster",
+      "input": "Fast button"
+    },
+    {
+      "id": "menus",
+      "action": "Move through buttons",
+      "input": "Tab, then Enter"
+    }
   ],
   "hud": {
     "coins": "Coins",
@@ -187,11 +231,26 @@
     }
   },
   "items": {
-    "daisy": { "one": "Daisy", "other": "Daisies" },
-    "lavender": { "one": "Lavender", "other": "Lavender" },
-    "daisyBundle": { "one": "Daisy Bundle", "other": "Daisy Bundles" },
-    "lavenderSachet": { "one": "Lavender Sachet", "other": "Lavender Sachets" },
-    "mixedBouquet": { "one": "Mixed Bouquet", "other": "Mixed Bouquets" }
+    "daisy": {
+      "one": "Daisy",
+      "other": "Daisies"
+    },
+    "lavender": {
+      "one": "Lavender",
+      "other": "Lavender"
+    },
+    "daisyBundle": {
+      "one": "Daisy Bundle",
+      "other": "Daisy Bundles"
+    },
+    "lavenderSachet": {
+      "one": "Lavender Sachet",
+      "other": "Lavender Sachets"
+    },
+    "mixedBouquet": {
+      "one": "Mixed Bouquet",
+      "other": "Mixed Bouquets"
+    }
   },
   "recipes": {
     "daisy": {
@@ -372,7 +431,9 @@
       "short": "2 Daisies",
       "reward": "Pays {coins} coins",
       "complete": "Nell's daisies are packed.",
-      "unlocks": ["bundlingTable"],
+      "unlocks": [
+        "bundlingTable"
+      ],
       "unlockLine": "You can build a Bundling Table now. Two daisies make one Daisy Bundle."
     },
     "order2": {
@@ -396,7 +457,9 @@
       "short": "4 Daisy Bundles",
       "reward": "Pays {coins} coins",
       "complete": "Hester's four bundles are packed.",
-      "unlocks": ["lavenderBed"],
+      "unlocks": [
+        "lavenderBed"
+      ],
       "unlockLine": "You can build a Lavender Bed now. It takes longer to grow than daisies."
     },
     "order4": {
@@ -408,7 +471,9 @@
       "short": "2 Lavender",
       "reward": "Pays {coins} coins",
       "complete": "Ivo's lavender is packed.",
-      "unlocks": ["dryingBench"],
+      "unlocks": [
+        "dryingBench"
+      ],
       "unlockLine": "You can build a Drying Bench now. Two lavender make one Lavender Sachet."
     },
     "order5": {
@@ -420,7 +485,9 @@
       "short": "2 Lavender Sachets",
       "reward": "Pays {coins} coins",
       "complete": "Pia's sachets are packed.",
-      "unlocks": ["arrangementTable"],
+      "unlocks": [
+        "arrangementTable"
+      ],
       "unlockLine": "You can build an Arrangement Table now. A bundle and a sachet make one Mixed Bouquet."
     },
     "order6": {
@@ -667,6 +734,17 @@
         "H",
         "Open How to Play"
       ]
-    ]
+    ],
+    "sound": {
+      "musicVolume": "Music volume",
+      "musicVolumeHelp": "How loud the tune plays.",
+      "sfxVolume": "Sound effects volume",
+      "sfxVolumeHelp": "Let go of the slider to hear a sample.",
+      "on": "Sound on",
+      "off": "Sound off",
+      "tooltip": "Sound on or off (M)",
+      "a11yOn": "Sound on. Press to mute the music and effects.",
+      "a11yOff": "Sound off. Press to hear the music and effects again."
+    }
   }
 }

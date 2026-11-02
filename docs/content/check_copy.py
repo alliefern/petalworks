@@ -198,6 +198,15 @@ EXTRA_LEAF_PATHS = (
     'extra.controlsExtra[9][1]',
     'extra.controlsExtra[10][0]',
     'extra.controlsExtra[10][1]',
+    'extra.sound.musicVolume',
+    'extra.sound.musicVolumeHelp',
+    'extra.sound.sfxVolume',
+    'extra.sound.sfxVolumeHelp',
+    'extra.sound.on',
+    'extra.sound.off',
+    'extra.sound.tooltip',
+    'extra.sound.a11yOn',
+    'extra.sound.a11yOff',
 )
 
 EXTRA_TOKENS: dict[str, set[str]] = {

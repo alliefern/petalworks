@@ -56,6 +56,18 @@ export function TopBar({ onRecenter, onZoom }: { onRecenter: () => void; onZoom:
             {fmt(EXTRA.hud.speedN, { n: s })}
           </button>
         ))}
+        <button
+          className={'btn icon' + (ui.settings.muted ? ' muted' : '')}
+          onClick={() => store.toggleMute()}
+          onPointerEnter={hover}
+          aria-label={ui.settings.muted ? EXTRA.sound.a11yOff : EXTRA.sound.a11yOn}
+          aria-pressed={!ui.settings.muted}
+          title={EXTRA.sound.tooltip}
+          data-testid="mute"
+        >
+          <Icon k={ui.settings.muted ? 'ui.sound.off' : 'ui.sound.on'} size={22} alt="" />
+          <span className="sr-only">{ui.settings.muted ? EXTRA.sound.off : EXTRA.sound.on}</span>
+        </button>
       </div>
       <div className="card group">
         <button className="btn" onClick={() => store.dispatch({ type: 'undo' })} onPointerEnter={hover} aria-label={COPY.a11y.undo} title={COPY.hud.undoTooltip} data-testid="undo">

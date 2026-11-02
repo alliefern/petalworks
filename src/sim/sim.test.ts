@@ -525,6 +525,19 @@ describe('save and load', () => {
     expect(JSON.stringify(loaded.sim.world)).toBe(JSON.stringify(sim.world));
   });
 
+  it('keeps the mute and the two volume levels, clamped to 0-100, and defaults them when missing', () => {
+    const sim = rich();
+    const loaded = deserialize(serialize(sim, { ...DEFAULT_SETTINGS, muted: true, musicVolume: 40, sfxVolume: 250 }, 0));
+    expect(loaded.ok && loaded.settings).toMatchObject({ muted: true, musicVolume: 40, sfxVolume: 100, sound: true, music: true });
+    // An older save without the new keys gets the defaults.
+    const file = JSON.parse(serialize(sim, DEFAULT_SETTINGS, 0));
+    delete file.settings.muted;
+    delete file.settings.musicVolume;
+    file.settings.sfxVolume = 'loud';
+    const older = deserialize(JSON.stringify(file));
+    expect(older.ok && older.settings).toMatchObject({ muted: false, musicVolume: 80, sfxVolume: 80 });
+  });
+
   it('restores a completed (sandbox) save', () => {
     const sim = rich();
     sim.world.orders = { activeId: null, offeredIds: [], completedIds: ORDERS.map((o) => o.id), progress: { orderId: null, delivered: {} } };

@@ -165,11 +165,23 @@ test.describe('Petalworks smoke', () => {
     await page.getByRole('radio', { name: 'Sound effects off', exact: true }).click();
     await page.getByRole('radio', { name: 'Music off', exact: true }).click();
     await page.getByRole('radio', { name: 'Reduced motion on', exact: true }).click();
+    // Volume sliders: set both, then the top-bar speaker mutes without touching them.
+    await page.getByTestId('music-volume').fill('40');
+    await page.getByTestId('sfx-volume').fill('25');
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('settings-modal')).toHaveCount(0);
+    await expect(page.getByTestId('mute')).toHaveAttribute('aria-pressed', 'true');
+    await page.getByTestId('mute').click();
+    await expect(page.getByTestId('mute')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByTestId('mute')).toHaveAccessibleName(/Sound off/);
     await page.reload();
     await page.click('[data-testid="continue"]');
-    expect(await page.evaluate(() => (window as any).petalworks.ui.settings)).toMatchObject({ sound: false, music: false, reducedMotion: true });
+    expect(await page.evaluate(() => (window as any).petalworks.ui.settings)).toMatchObject({ sound: false, music: false, reducedMotion: true, muted: true, musicVolume: 40, sfxVolume: 25 });
+    await expect(page.getByTestId('mute')).toHaveAttribute('aria-pressed', 'false');
+    // M toggles the speaker back on and keeps the levels.
+    await page.keyboard.press('m');
+    await expect(page.getByTestId('mute')).toHaveAttribute('aria-pressed', 'true');
+    expect(await page.evaluate(() => (window as any).petalworks.ui.settings)).toMatchObject({ muted: false, musicVolume: 40, sfxVolume: 25 });
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-reduced-motion'))).toBe('true');
 
     // Pause freezes the tick counter.

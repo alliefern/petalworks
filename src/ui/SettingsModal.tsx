@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { audio } from '../app/audio';
 import { store } from '../app/store';
 import { COPY, EXTRA } from './strings';
 import { useFocusTrap } from './useFocusTrap';
@@ -13,6 +14,29 @@ function Toggle({ value, onChange, label, onName, offName }: { value: boolean; o
         {COPY.settings.off}
       </button>
     </div>
+  );
+}
+
+function Slider({ value, label, onChange, onRelease, testId }: { value: number; label: string; onChange: (v: number) => void; onRelease?: () => void; testId: string }) {
+  return (
+    <label className="slider">
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        value={value}
+        aria-label={label}
+        aria-valuetext={`${value}`}
+        onChange={(e) => onChange(Number(e.currentTarget.value))}
+        onPointerUp={onRelease}
+        onKeyUp={onRelease}
+        data-testid={testId}
+      />
+      <span className="val" aria-hidden>
+        {value}
+      </span>
+    </label>
   );
 }
 
@@ -39,6 +63,20 @@ export function SettingsModal() {
             <div className="desc">{EXTRA.settings.musicHelp}</div>
           </div>
           <Toggle label={COPY.settings.music} onName={COPY.a11y.musicOn} offName={COPY.a11y.musicOff} value={s.music} onChange={(v) => store.updateSettings({ music: v })} />
+        </div>
+        <div className="setting">
+          <div>
+            <div>{EXTRA.sound.musicVolume}</div>
+            <div className="desc">{EXTRA.sound.musicVolumeHelp}</div>
+          </div>
+          <Slider label={EXTRA.sound.musicVolume} value={s.musicVolume} onChange={(v) => store.updateSettings({ musicVolume: v })} testId="music-volume" />
+        </div>
+        <div className="setting">
+          <div>
+            <div>{EXTRA.sound.sfxVolume}</div>
+            <div className="desc">{EXTRA.sound.sfxVolumeHelp}</div>
+          </div>
+          <Slider label={EXTRA.sound.sfxVolume} value={s.sfxVolume} onChange={(v) => store.updateSettings({ sfxVolume: v })} onRelease={() => audio.preview()} testId="sfx-volume" />
         </div>
         <div className="setting">
           <div>

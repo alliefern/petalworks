@@ -135,6 +135,9 @@ export function App() {
         case 'p':
           store.togglePause();
           break;
+        case 'm':
+          store.toggleMute();
+          break;
         case 'f':
           store.cycleSpeed();
           break;

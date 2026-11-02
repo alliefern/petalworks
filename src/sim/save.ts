@@ -16,6 +16,11 @@ export const BACKUP_KEY = 'petalworks.save.backup';
 export interface Settings {
   sound: boolean;
   music: boolean;
+  /** The top-bar speaker: silences everything without touching the levels below. */
+  muted: boolean;
+  /** 0-100 slider levels. */
+  musicVolume: number;
+  sfxVolume: number;
   reducedMotion: boolean;
   tutorialStep: number;
   tutorialDismissed: boolean;
@@ -26,6 +31,9 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   sound: true,
   music: true,
+  muted: false,
+  musicVolume: 80,
+  sfxVolume: 80,
   reducedMotion: false,
   tutorialStep: 0,
   tutorialDismissed: false,
@@ -132,6 +140,10 @@ function pickSettings(u: Record<string, unknown>): Partial<Settings> {
   const out: Partial<Settings> = {};
   if (typeof u.sound === 'boolean') out.sound = u.sound;
   if (typeof u.music === 'boolean') out.music = u.music;
+  if (typeof u.muted === 'boolean') out.muted = u.muted;
+  const level = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(100, Math.round(v))) : undefined);
+  if (level(u.musicVolume) !== undefined) out.musicVolume = level(u.musicVolume);
+  if (level(u.sfxVolume) !== undefined) out.sfxVolume = level(u.sfxVolume);
   if (typeof u.reducedMotion === 'boolean') out.reducedMotion = u.reducedMotion;
   if (typeof u.tutorialStep === 'number') out.tutorialStep = u.tutorialStep;
   if (typeof u.tutorialDismissed === 'boolean') out.tutorialDismissed = u.tutorialDismissed;

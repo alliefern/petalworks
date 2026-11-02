@@ -225,6 +225,17 @@ export const EXTRA_FALLBACK = {
     ['Home', 'Fit the garden'],
     ['H', 'Tips'],
   ] as const,
+  sound: {
+    musicVolume: 'Music volume',
+    musicVolumeHelp: 'How loud the tune plays.',
+    sfxVolume: 'Sound effects volume',
+    sfxVolumeHelp: 'Let go of the slider to hear a sample.',
+    on: 'Sound on',
+    off: 'Sound off',
+    tooltip: 'Sound on or off (M)',
+    a11yOn: 'Sound on. Press to mute the music and effects.',
+    a11yOff: 'Sound off. Press to hear the music and effects again.',
+  },
 };
 
 /** Leftover UI strings. copy.json `extra` wins; a missing key keeps EXTRA_FALLBACK. */

@@ -77,6 +77,11 @@ export class AudioEngine {
   private useOgg = true;
   sound = true;
   music = true;
+  /** Top-bar mute: everything silent, slider levels kept. */
+  muted = false;
+  /** Slider levels, 0..1. */
+  sfxLevel = 0.8;
+  musicLevel = 0.8;
   paused = false;
   unlocked = false;
 
@@ -105,7 +110,7 @@ export class AudioEngine {
       this.master.gain.value = 0.9;
       this.master.connect(comp).connect(this.ctx.destination);
       this.sfxGain = this.ctx.createGain();
-      this.sfxGain.gain.value = this.sound ? 1 : 0;
+      this.sfxGain.gain.value = this.sfxTarget();
       this.sfxGain.connect(this.master);
       // Music: Sugar Belt's generative band on its own bus with a soft reverb return.
       this.musicGain = this.ctx.createGain();
@@ -127,9 +132,9 @@ export class AudioEngine {
       this.unlocked = true;
       void this.ctx.resume();
       // Fade the band in instead of starting at full level.
-      if (this.music) {
+      if (this.musicTarget() > 0) {
         this.musicGain.gain.setValueAtTime(0, this.ctx.currentTime);
-        this.musicGain.gain.linearRampToValueAtTime(MUSIC_LEVEL, this.ctx.currentTime + 4);
+        this.musicGain.gain.linearRampToValueAtTime(this.musicTarget(), this.ctx.currentTime + 4);
       }
       for (const k of ['ui_click', 'build_place', 'ui_error', 'deliver', 'item_pop'] as CueKey[]) void this.load(k);
     } catch {
@@ -156,7 +161,45 @@ export class AudioEngine {
   }
 
   private musicTarget(): number {
-    return this.music ? MUSIC_LEVEL * (this.paused ? MUSIC_PAUSED_SCALE : 1) : 0;
+    return this.music && !this.muted ? MUSIC_LEVEL * this.musicLevel * (this.paused ? MUSIC_PAUSED_SCALE : 1) : 0;
+  }
+
+  private sfxTarget(): number {
+    return this.sound && !this.muted ? this.sfxLevel : 0;
+  }
+
+  /** Push the current toggles and levels to both buses. */
+  private applyLevels(): void {
+    if (!this.ctx) return;
+    if (this.sfxGain) this.sfxGain.gain.setTargetAtTime(this.sfxTarget(), this.ctx.currentTime, 0.05);
+    if (this.musicGain) {
+      this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.musicGain.gain.setTargetAtTime(this.musicTarget(), this.ctx.currentTime, 0.2);
+    }
+    if (this.sfxTarget() === 0) {
+      this.stopLoop('machine_working');
+      this.stopLoop('belt_tick');
+    }
+  }
+
+  /** The top-bar speaker: silence everything, keep the slider levels. */
+  setMuted(on: boolean): void {
+    const wasAudible = this.musicTarget() > 0;
+    this.muted = on;
+    this.applyLevels();
+    if (!wasAudible && this.musicTarget() > 0 && this.musicTrack && this.ctx) this.musicTrack.nextBarTime = this.ctx.currentTime + 0.3;
+  }
+
+  /** Slider levels, 0..1 each. */
+  setLevels(sfx: number, music: number): void {
+    this.sfxLevel = Math.max(0, Math.min(1, sfx));
+    this.musicLevel = Math.max(0, Math.min(1, music));
+    this.applyLevels();
+  }
+
+  /** A short sample at the current effects level (the slider plays it on release). */
+  preview(): void {
+    this.play('build_place', { throttleMs: 0 });
   }
 
   /** For tests and the console: is the band running, and where is it. */
@@ -199,11 +242,7 @@ export class AudioEngine {
 
   setSound(on: boolean): void {
     this.sound = on;
-    if (this.sfxGain && this.ctx) this.sfxGain.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.05);
-    if (!on) {
-      this.stopLoop('machine_working');
-      this.stopLoop('belt_tick');
-    }
+    this.applyLevels();
   }
 
   setMusic(on: boolean): void {
@@ -231,7 +270,7 @@ export class AudioEngine {
 
   play(key: CueKey, opts: { throttleMs?: number; delay?: number } = {}): void {
     if (!this.ctx || !this.sfxGain) return;
-    if (!this.sound) return;
+    if (!this.sound || this.muted) return;
     const now = performance.now();
     const throttle = opts.throttleMs ?? 40;
     if (now - (this.lastPlay.get(key) ?? -1e9) < throttle) return;
