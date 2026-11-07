@@ -1,7 +1,7 @@
 # Status
 
 **Phase:** Phases 1–3 complete · Phase 4 polish done for this pass · final art and final copy wired
-**Last updated:** Nov 2, 2026 (04:10 UK)
+**Last updated:** Nov 7, 2026 (08:50 UK)
 
 ## What works right now (plain English)
 - Start a garden, read Nell's order, plant a Daisy Bed, drag belts to the crate, watch daisies ride in, get paid, unlock the next tool. All six orders work end to end, then the market opens (goods sell on arrival, every tool available).
@@ -13,6 +13,11 @@
 - Full keyboard play, dialogs trap focus, one reduced-motion flag, sound/music toggles persist. The real sound set is wired.
 - Autosave, Continue / New Game with confirmation, corrupted-save backup, schema v2 with a v1 migration.
 - Default zoom keeps tiles at least 48 px; at 1366×768 the garden sits between the tip card and the order card instead of under them; the fit re-runs on window resize (Steam-plan guardrail).
+
+## Round of Nov 7, 08:50 (CI red: Open Plot label over the palette at 1024×640)
+- Cause: the closed-field label avoids the HUD cards using cached card boxes (added in the Nov 2 04:10 round to stop layout reads every frame). The cache only refreshed on a window or HUD-state change, or every half second, so when the Open Plot tool joined the palette (the palette gets wider) the label could be placed beside the *old* palette edge and land on the new one. That timing is what CI hit; reproduced locally with a throttled CPU.
+- Fix: the cache now also refreshes on any HUD DOM change (a MutationObserver on the HUD root) and when fonts finish loading, and the label is re-placed right then and on resize, so it never lags the cards. Placement also derives the view from the camera's scroll and zoom instead of the previous frame's `worldView`, so the first frame after a resize or Fit is already right. Still zero layout reads on a quiet frame.
+- Verified: `e2e/smoke.spec.ts` 6/6 (the label test unchanged, run 9 times), `npm test` 58/58, `tsc` clean, `check_copy.py` PASS.
 
 ## Round of Nov 2, 04:10 (plan update and performance follow-ups)
 - `qa/ACCEPTANCE_TEST_PLAN.md` now describes the irregular plot: about 180 buildable tiles inside a 20 by 14 box at the start, about 90 more after Open Plot, with test 53 rewritten around the hedge, the bays and the closed field.

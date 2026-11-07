@@ -194,3 +194,10 @@ run11 got a 429 "5-hour limit, resets 00:30" on its first turn, so nothing from 
   2. Performance follow-ups from the audit: skip redrawing belt views that didn't change this frame, a cheaper HUD subscription, then subset the Nunito fonts to the characters the copy uses. Measure with `tools/firstload.mjs` and a soak before and after, and record the numbers in STATUS.md.
   3. Refresh STATUS.md "Next" and finish your turn cleanly with a short summary. Don't start a background job you won't wait for.
 - Keep each Bash call under about 5 minutes, never Read PNGs directly (small JPEG copies in /tmp), don't push.
+
+## 2026-11-07 08:31 UK: CI red on main — Open Plot label overlaps palette at 1024×640
+GitHub Actions CI on HEAD `74d604c` failed (run 41385004638, 2026-11-02): 5 of 6 e2e passed; the failing test is `e2e/smoke.spec.ts` "the Open Plot label stays on screen and clear of the side cards".
+
+At resize 1024×640 the locked-field label is on screen but overlaps `.palette` (report left/top/right/bottom vs palette box). Fix so the Open Plot label stays fully on screen AND clear of the side cards (palette, tip, order) at 1024×640 after resize and after Fit. Keep the existing helper `expectLockedLabelClear` green. Don't loosen the assertion.
+
+Commit when green locally (`npm run test:e2e` for that file, plus unit/tsc/`check_copy.py` as usual). Don't push; the producer pushes. Update STATUS.md briefly with the fix. Then stop — still waiting on Allie's human playtest and the listening pass; don't invent further work.

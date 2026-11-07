@@ -137,7 +137,14 @@ export class PetalScene extends Phaser.Scene {
       .setDepth(DEPTH.fx);
 
     this.setupInput();
-    this.scale.on('resize', () => this.applyFit(this.camCtl.reframe(this.store.ui.paletteOpen, this.store.ui.tutorialOpen)));
+    this.scale.on('resize', () => {
+      this.applyFit(this.camCtl.reframe(this.store.ui.paletteOpen, this.store.ui.tutorialOpen));
+      this.cardsDirty = true;
+      this.placeLockedLabels();
+    });
+    this.watchHud();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.unwatchHud());
+    this.events.once(Phaser.Scenes.Events.DESTROY, () => this.unwatchHud());
     (window as unknown as { __cam?: unknown; __scene?: unknown }).__cam = this.cameras.main;
     (window as unknown as { __scene?: unknown }).__scene = this;
     this.ready = true;
@@ -661,7 +668,10 @@ export class PetalScene extends Phaser.Scene {
     if (!this.lockedText.length) return;
     const cam = this.cameras.main;
     const zoom = this.camCtl.cssZoom || 1; // CSS px per world px; the HUD cards are CSS px
-    const view = cam.worldView;
+    // Camera.worldView is only refreshed when the frame renders, so right after a resize or
+    // Fit it still describes the previous frame. Derive the view the same way preRender does.
+    const camZoom = cam.zoom || 1;
+    const view = { x: cam.scrollX + (cam.width - cam.width / camZoom) / 2, y: cam.scrollY + (cam.height - cam.height / camZoom) / 2 };
     const screen = this.camCtl.cssSize;
     const cards = this.labelCards();
     for (const t of this.lockedText) {
@@ -678,17 +688,51 @@ export class PetalScene extends Phaser.Scene {
     }
   }
 
-  /** Cached HUD card boxes: layout reads inside the render loop are a cost, so they are refreshed only when the HUD state or window changes, or every half second. */
+  /**
+   * Cached HUD card boxes: layout reads inside the render loop are a cost, so they are
+   * refreshed only when the HUD DOM changes (any React commit, e.g. the Open Plot tool
+   * joining the palette), fonts finish loading, the HUD state or window changes, or every
+   * half second as a backstop.
+   */
   private cardCache: { key: string; at: number; boxes: ScreenBox[] } | null = null;
+  private cardsDirty = true;
+  private hudObserver: MutationObserver | null = null;
+  private onFontsDone: (() => void) | null = null;
+
+  /** Any HUD change re-reads the cards and re-places the label at once, so it never lags the DOM. */
+  private watchHud(): void {
+    if (typeof document === 'undefined') return;
+    const root = document.getElementById('root') ?? document.body;
+    const invalidate = () => {
+      this.cardsDirty = true;
+      if (this.ready && this.store.ui.screen === 'game') this.placeLockedLabels();
+    };
+    if (typeof MutationObserver !== 'undefined') {
+      this.hudObserver = new MutationObserver(invalidate);
+      this.hudObserver.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden'] });
+    }
+    if (document.fonts && typeof document.fonts.addEventListener === 'function') {
+      this.onFontsDone = invalidate;
+      document.fonts.addEventListener('loadingdone', this.onFontsDone);
+    }
+  }
+
+  private unwatchHud(): void {
+    this.hudObserver?.disconnect();
+    this.hudObserver = null;
+    if (this.onFontsDone && typeof document !== 'undefined' && document.fonts) document.fonts.removeEventListener('loadingdone', this.onFontsDone);
+    this.onFontsDone = null;
+  }
 
   /** HUD cards the closed-field label must not sit under. */
   private labelCards(): ScreenBox[] {
     const ui = this.store.ui;
     const key = `${this.scale.width}x${this.scale.height}|${ui.tutorialOpen}|${ui.paletteOpen}|${ui.selectedId !== null}|${ui.settingsOpen}|${ui.screen}`;
     const now = performance.now();
-    if (this.cardCache && this.cardCache.key === key && now - this.cardCache.at < 500) return this.cardCache.boxes;
+    if (!this.cardsDirty && this.cardCache && this.cardCache.key === key && now - this.cardCache.at < 500) return this.cardCache.boxes;
     const boxes = this.readLabelCards();
     this.cardCache = { key, at: now, boxes };
+    this.cardsDirty = false;
     return boxes;
   }
 
